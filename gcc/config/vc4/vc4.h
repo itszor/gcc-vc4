@@ -1,5 +1,5 @@
 /* Definitions of target machine for GNU compiler,
-   for Motorola M*CORE Processor.
+   for Broadcom VideoCore IV processor.
    Copyright (C) 1993-2013 Free Software Foundation, Inc.
 
    This file is part of GCC.
@@ -18,72 +18,36 @@
    along with GCC; see the file COPYING3.  If not see
    <http://www.gnu.org/licenses/>.  */
 
-#ifndef GCC_MCORE_H
-#define GCC_MCORE_H
-
-/* RBE: need to move these elsewhere.  */
-#undef	LIKE_PPC_ABI 
-#define	MCORE_STRUCT_ARGS
-/* RBE: end of "move elsewhere".  */
+#ifndef GCC_VC4_H
+#define GCC_VC4_H
 
 /* Run-time Target Specification.  */
-#define TARGET_MCORE
+#define TARGET_VC4
 
 /* Get tree.c to declare a target-specific specialization of
    merge_decl_attributes.  */
 #define TARGET_DLLIMPORT_DECL_ATTRIBUTES 1
 
-#define TARGET_CPU_CPP_BUILTINS()					  \
-  do									  \
-    {									  \
-      builtin_define ("__mcore__");					  \
-      builtin_define ("__MCORE__");					  \
-      if (TARGET_LITTLE_END)						  \
-        builtin_define ("__MCORELE__");					  \
-      else								  \
-        builtin_define ("__MCOREBE__");					  \
-      if (TARGET_M340)							  \
-        builtin_define ("__M340__");					  \
-      else								  \
-        builtin_define ("__M210__");					  \
-    }									  \
+#define TARGET_CPU_CPP_BUILTINS() \
+  do \
+    { \
+      builtin_define ("__vc4__"); \
+      builtin_define ("__VC4__"); \
+    } \
   while (0)
-
-#undef  CPP_SPEC
-#define CPP_SPEC "%{m210:%{mlittle-endian:%ethe m210 does not have little endian support}}"
 
 /* We don't have a -lg library, so don't put it in the list.  */
 #undef	LIB_SPEC
 #define LIB_SPEC "%{!shared: %{!p:%{!pg:-lc}}%{p:-lc_p}%{pg:-lc_p}}"
 
-#undef	ASM_SPEC
-#define	ASM_SPEC "%{mbig-endian:-EB} %{m210:-cpu=210 -EB}"
-
-#undef  LINK_SPEC
-#define LINK_SPEC "%{mbig-endian:-EB} %{m210:-EB} -X"
-
-#define TARGET_DEFAULT	\
-  (MASK_HARDLIT		\
-   | MASK_DIV		\
-   | MASK_RELAX_IMM	\
-   | MASK_M340		\
-   | MASK_LITTLE_END)
-
-#ifndef MULTILIB_DEFAULTS
-#define MULTILIB_DEFAULTS { "mlittle-endian", "m340" }
-#endif
-
 /* The ability to have 4 byte alignment is being suppressed for now.
    If this ability is reenabled, you must disable the definition below
-   *and* edit t-mcore to enable multilibs for 4 byte alignment code.  */
+   *and* edit t-vc4 to enable multilibs for 4 byte alignment code.  */
 #undef TARGET_8ALIGN
 #define TARGET_8ALIGN 1
 
 extern char * mcore_current_function_name;
  
-/* The MCore ABI says that bitfields are unsigned by default.  */
-#define CC1_SPEC "-funsigned-bitfields"
-
 /* Target machine storage Layout.  */
 
 #define PROMOTE_MODE(MODE,UNSIGNEDP,TYPE)  	\
@@ -94,21 +58,17 @@ extern char * mcore_current_function_name;
       (UNSIGNEDP) = 1;				\
     }
 
-/* Define this if most significant bit is lowest numbered
-   in instructions that operate on numbered bit-fields.  */
-#define BITS_BIG_ENDIAN  0
+/* Endianness configuration. */
+#define TARGET_LITTLE_END 1
 
-/* Define this if most significant byte of a word is the lowest numbered.  */
+#define BITS_BIG_ENDIAN  (! TARGET_LITTLE_END)
 #define BYTES_BIG_ENDIAN (! TARGET_LITTLE_END)
-
-/* Define this if most significant word of a multiword number is the lowest
-   numbered.  */
 #define WORDS_BIG_ENDIAN (! TARGET_LITTLE_END)
 
 #define MAX_BITS_PER_WORD 32
 
 /* Width of a word, in units (bytes).  */
-#define UNITS_PER_WORD	4
+#define UNITS_PER_WORD 4
 
 /* A C expression for the size in bits of the type `long long' on the
    target machine.  If you don't define this, the default is two
@@ -116,22 +76,22 @@ extern char * mcore_current_function_name;
 #define LONG_LONG_TYPE_SIZE 64
 
 /* Allocation boundary (in *bits*) for storing arguments in argument list.  */
-#define PARM_BOUNDARY  	32
+#define PARM_BOUNDARY 32
 
 /* Boundary (in *bits*) on which stack pointer should be aligned.  */
-#define STACK_BOUNDARY  (TARGET_8ALIGN ? 64 : 32)
+#define STACK_BOUNDARY (TARGET_8ALIGN ? 64 : 32)
 
 /* Largest increment in UNITS we allow the stack to grow in a single operation.  */
-#define STACK_UNITS_MAXSTEP  4096
+#define STACK_UNITS_MAXSTEP 4096
 
 /* Allocation boundary (in *bits*) for the code of a function.  */
-#define FUNCTION_BOUNDARY  ((TARGET_OVERALIGN_FUNC) ? 32 : 16)
+#define FUNCTION_BOUNDARY 16
 
 /* Alignment of field after `int : 0' in a structure.  */
-#define EMPTY_FIELD_BOUNDARY  32
+#define EMPTY_FIELD_BOUNDARY 32
 
 /* No data type wants to be aligned rounder than this.  */
-#define BIGGEST_ALIGNMENT  (TARGET_8ALIGN ? 64 : 32)
+#define BIGGEST_ALIGNMENT (TARGET_8ALIGN ? 64 : 32)
 
 /* The best alignment to use in cases where we have a choice.  */
 #define FASTEST_ALIGNMENT 32
@@ -142,22 +102,22 @@ extern char * mcore_current_function_name;
 /* Look at the fundamental type that is used for a bit-field and use 
    that to impose alignment on the enclosing structure.
    struct s {int a:8}; should have same alignment as "int", not "char".  */
-#define	PCC_BITFIELD_TYPE_MATTERS	1
+#define	PCC_BITFIELD_TYPE_MATTERS 1
 
 /* Largest integer machine mode for structures.  If undefined, the default
    is GET_MODE_SIZE(DImode).  */
 #define MAX_FIXED_MODE_SIZE 32
 
 /* Make strings word-aligned so strcpy from constants will be faster.  */
-#define CONSTANT_ALIGNMENT(EXP, ALIGN)  \
-  ((TREE_CODE (EXP) == STRING_CST	\
-    && (ALIGN) < FASTEST_ALIGNMENT)	\
+#define CONSTANT_ALIGNMENT(EXP, ALIGN) \
+  ((TREE_CODE (EXP) == STRING_CST \
+    && (ALIGN) < FASTEST_ALIGNMENT) \
    ? FASTEST_ALIGNMENT : (ALIGN))
 
 /* Make arrays of chars word-aligned for the same reasons.  */
-#define DATA_ALIGNMENT(TYPE, ALIGN)		\
-  (TREE_CODE (TYPE) == ARRAY_TYPE		\
-   && TYPE_MODE (TREE_TYPE (TYPE)) == QImode	\
+#define DATA_ALIGNMENT(TYPE, ALIGN) \
+  (TREE_CODE (TYPE) == ARRAY_TYPE \
+   && TYPE_MODE (TREE_TYPE (TYPE)) == QImode \
    && (ALIGN) < FASTEST_ALIGNMENT ? FASTEST_ALIGNMENT : (ALIGN))
      
 /* Set this nonzero if move instructions will actually fail to work
@@ -648,7 +608,7 @@ extern const enum reg_class regno_reg_class[FIRST_PSEUDO_REGISTER];
 #define LOAD_EXTEND_OP(MODE) ZERO_EXTEND
 
 /* Nonzero if access to memory by bytes is slow and undesirable.  */
-#define SLOW_BYTE_ACCESS TARGET_SLOW_BYTES
+#define SLOW_BYTE_ACCESS 0
 
 /* Shift counts are truncated to 6-bits (0 to 63) instead of the expected
    5-bits, so we can not define SHIFT_COUNT_TRUNCATED to true for this
@@ -836,4 +796,4 @@ extern long mcore_current_compilation_timestamp;
     }									\
   while (0)
 
-#endif /* ! GCC_MCORE_H */
+#endif /* ! GCC_VC4_H */
