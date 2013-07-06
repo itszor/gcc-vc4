@@ -95,7 +95,7 @@ static int        calc_live_regs                (int *);
 static int        try_constant_tricks           (long, HOST_WIDE_INT *, HOST_WIDE_INT *);
 static const char *     output_inline_const     (enum machine_mode, rtx *);
 static void       layout_mcore_frame            (struct mcore_frame *);
-static void       mcore_setup_incoming_varargs	(cumulative_args_t, enum machine_mode, tree, int *, int);
+static void       vc4_setup_incoming_varargs    (cumulative_args_t, enum machine_mode, tree, int *, int);
 static cond_type  is_cond_candidate             (rtx);
 static rtx        emit_new_cond_insn            (rtx, int);
 static rtx        conditionalize_block          (rtx);
@@ -124,16 +124,16 @@ static bool       mcore_rtx_costs		(rtx, int, int, int,
 						 int *, bool);
 static void       mcore_external_libcall	(rtx);
 static bool       mcore_return_in_memory	(const_tree, const_tree);
-static int        mcore_arg_partial_bytes       (cumulative_args_t,
+static int        vc4_arg_partial_bytes         (cumulative_args_t,
 						 enum machine_mode,
 						 tree, bool);
-static rtx        mcore_function_arg            (cumulative_args_t,
+static rtx        vc4_function_arg              (cumulative_args_t,
 						 enum machine_mode,
 						 const_tree, bool);
-static void       mcore_function_arg_advance    (cumulative_args_t,
+static void       vc4_function_arg_advance      (cumulative_args_t,
 						 enum machine_mode,
 						 const_tree, bool);
-static unsigned int mcore_function_arg_boundary (enum machine_mode,
+static unsigned int vc4_function_arg_boundary   (enum machine_mode,
 						 const_tree);
 static void       mcore_asm_trampoline_template (FILE *);
 static void       mcore_trampoline_init		(rtx, tree, rtx);
@@ -206,16 +206,16 @@ static const struct attribute_spec mcore_attribute_table[] =
 #undef  TARGET_PASS_BY_REFERENCE
 #define TARGET_PASS_BY_REFERENCE  hook_pass_by_reference_must_pass_in_stack
 #undef  TARGET_ARG_PARTIAL_BYTES
-#define TARGET_ARG_PARTIAL_BYTES	mcore_arg_partial_bytes
+#define TARGET_ARG_PARTIAL_BYTES	vc4_arg_partial_bytes
 #undef  TARGET_FUNCTION_ARG
-#define TARGET_FUNCTION_ARG		mcore_function_arg
+#define TARGET_FUNCTION_ARG		vc4_function_arg
 #undef  TARGET_FUNCTION_ARG_ADVANCE
-#define TARGET_FUNCTION_ARG_ADVANCE	mcore_function_arg_advance
+#define TARGET_FUNCTION_ARG_ADVANCE	vc4_function_arg_advance
 #undef  TARGET_FUNCTION_ARG_BOUNDARY
-#define TARGET_FUNCTION_ARG_BOUNDARY	mcore_function_arg_boundary
+#define TARGET_FUNCTION_ARG_BOUNDARY	vc4_function_arg_boundary
 
 #undef  TARGET_SETUP_INCOMING_VARARGS
-#define TARGET_SETUP_INCOMING_VARARGS	mcore_setup_incoming_varargs
+#define TARGET_SETUP_INCOMING_VARARGS	vc4_setup_incoming_varargs
 
 #undef  TARGET_ASM_TRAMPOLINE_TEMPLATE
 #define TARGET_ASM_TRAMPOLINE_TEMPLATE	mcore_asm_trampoline_template
@@ -1698,7 +1698,7 @@ mcore_initial_elimination_offset (int from, int to)
 /* Keep track of some information about varargs for the prolog.  */
 
 static void
-mcore_setup_incoming_varargs (cumulative_args_t args_so_far_v,
+vc4_setup_incoming_varargs (cumulative_args_t args_so_far_v,
 			      enum machine_mode mode, tree type,
 			      int * ptr_pretend_size ATTRIBUTE_UNUSED,
 			      int second_time ATTRIBUTE_UNUSED)
@@ -2514,13 +2514,13 @@ mcore_function_value (const_tree valtype, const_tree func)
    NAMED is nonzero if this argument is a named parameter
     (otherwise it is an extra parameter matching an ellipsis).
 
-   On MCore the first args are normally in registers
+   On the Videocore the first args are normally in registers
    and the rest are pushed.  Any arg that starts within the first
    NPARM_REGS words is at least partially passed in a register unless
    its data type forbids.  */
 
 static rtx
-mcore_function_arg (cumulative_args_t cum, enum machine_mode mode,
+vc4_function_arg (cumulative_args_t cum, enum machine_mode mode,
 		    const_tree type, bool named)
 {
   int arg_reg;
@@ -2540,7 +2540,7 @@ mcore_function_arg (cumulative_args_t cum, enum machine_mode mode,
 }
 
 static void
-mcore_function_arg_advance (cumulative_args_t cum_v, enum machine_mode mode,
+vc4_function_arg_advance (cumulative_args_t cum_v, enum machine_mode mode,
 			    const_tree type, bool named ATTRIBUTE_UNUSED)
 {
   CUMULATIVE_ARGS *cum = get_cumulative_args (cum_v);
@@ -2550,7 +2550,7 @@ mcore_function_arg_advance (cumulative_args_t cum_v, enum machine_mode mode,
 }
 
 static unsigned int
-mcore_function_arg_boundary (enum machine_mode mode,
+vc4_function_arg_boundary (enum machine_mode mode,
 			     const_tree type ATTRIBUTE_UNUSED)
 {
   /* Doubles must be aligned to an 8 byte boundary.  */
@@ -2567,7 +2567,7 @@ mcore_function_arg_boundary (enum machine_mode mode,
    the function.  */
 
 static int
-mcore_arg_partial_bytes (cumulative_args_t cum, enum machine_mode mode,
+vc4_arg_partial_bytes (cumulative_args_t cum, enum machine_mode mode,
 			 tree type, bool named)
 {
   int reg = ROUND_REG (*get_cumulative_args (cum), mode);
@@ -2578,14 +2578,6 @@ mcore_arg_partial_bytes (cumulative_args_t cum, enum machine_mode mode,
   if (targetm.calls.must_pass_in_stack (mode, type))
     return 0;
       
-  /* REG is not the *hardware* register number of the register that holds
-     the argument, it is the *argument* register number.  So for example,
-     the first argument to a function goes in argument register 0, which
-     translates (for the MCore) into hardware register 2.  The second
-     argument goes into argument register 1, which translates into hardware
-     register 3, and so on.  NPARM_REGS is the number of argument registers
-     supported by the target, not the maximum hardware register number of
-     the target.  */
   if (reg >= NPARM_REGS)
     return 0;
 

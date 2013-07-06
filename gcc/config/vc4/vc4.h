@@ -124,62 +124,71 @@ extern char * mcore_current_function_name;
    when given unaligned data.  */
 #define STRICT_ALIGNMENT 1
 
-/* Standard register usage.  */
+/* Standard register usage.
+ *
+ * Our registers are:
+ *
+ * r0-r5     fast GPR, caller-saved
+ * r6-r15    fast GPR
+ * r16-r23   GPR
+ * r24       gp
+ * r25       sp
+ * r26       lr
+ * r27-r31   system
+ * ?ap       virtual argument pointer
+ * ?fp       virtual frame pointer
+ * ?cc       virtual condition codes
+ *
+ * In emergencies, r6 is used as the frame pointer. r0-r5 are used for
+ * passing parameters; r0 and r1 are used for returning parameters.
+ *
+ * In addition:
+ * - r0, r6, r16 can be used in fast push/pop instructions.
+ *
+ */
 
-/* Register allocation for our first guess 
+enum
+{
+  R0_REG,  R1_REG,  R2_REG,  R3_REG,  R4_REG,  R5_REG,  R6_REG,  R7_REG,
+  R8_REG,  R9_REG,  R10_REG, R11_REG, R12_REG, R13_REG, R14_REG, R15_REG,
+  R16_REG, R17_REG, R18_REG, R19_REG, R20_REG, R21_REG, R22_REG, R23_REG,
+  GP_REG,  SP_REG,  LR_REG,
+  AP_REG,  FP_REG,  CC_REG,
 
-	r0		stack pointer
-	r1		scratch, target reg for xtrb?
-	r2-r7		arguments.
-	r8-r14		call saved
-	r15		link register
-	ap		arg pointer (doesn't really exist, always eliminated)
-	c               c bit
-	fp		frame pointer (doesn't really exist, always eliminated)
-	x19		two control registers.  */
-
-/* Number of actual hardware registers.
-   The hardware registers are assigned numbers for the compiler
-   from 0 to just below FIRST_PSEUDO_REGISTER.
-   All registers that the compiler knows about must be given numbers,
-   even those that are not normally considered general registers.
-
-   MCore has 16 integer registers and 2 control registers + the arg
-   pointer.  */
-
-#define FIRST_PSEUDO_REGISTER 20
-
-#define R1_REG  1	/* Where literals are forced.  */
-#define LK_REG	15	/* Overloaded on general register.  */
-#define AP_REG  16	/* Fake arg pointer register.  */
-/* RBE: mcore.md depends on CC_REG being set to 17.  */
-#define CC_REG	17	/* Can't name it C_REG.  */
-#define FP_REG  18	/* Fake frame pointer register.  */
+  FIRST_PSEUDO_REGISTER
+};
 
 /* Specify the registers used for certain standard purposes.
    The values of these macros are register numbers.  */
 
 
 #undef PC_REGNUM /* Define this if the program counter is overloaded on a register.  */
-#define STACK_POINTER_REGNUM 0 /* Register to use for pushing function arguments.  */
-#define FRAME_POINTER_REGNUM 8 /* When we need FP, use r8.  */
+#define STACK_POINTER_REGNUM SP_REG /* Register to use for pushing function arguments.  */
+#define FRAME_POINTER_REGNUM R6_REG /* When we need FP, use r6.  */
 
 /* The assembler's names for the registers.  RFP need not always be used as
    the Real framepointer; it can also be used as a normal general register.
    Note that the name `fp' is horribly misleading since `fp' is in fact only
    the argument-and-return-context pointer.  */
-#define REGISTER_NAMES  				\
-{				                   	\
-  "sp", "r1", "r2",  "r3",  "r4",  "r5",  "r6",  "r7", 	\
-  "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15",	\
-  "apvirtual",  "c", "fpvirtual", "x19" \
+#define REGISTER_NAMES \
+{ \
+  "r0",  "r1",  "r2",  "r3",  "r4",  "r5",  "r6",  "r7", \
+  "r8",  "r9",  "r10", "r11", "r12", "r13", "r14", "r15", \
+  "r16", "r17", "r18", "r19", "r20", "r21", "r22", "r23", \
+  "gp",  "sp",  "lr", \
+  "?ap", "?fp", "?cc" \
 }
 
 /* 1 for registers that have pervasive standard uses
    and are not available for the register allocator.  */
-#define FIXED_REGISTERS  \
- /*  r0  r1  r2  r3  r4  r5  r6  r7  r8  r9  r10 r11 r12 r13 r14 r15 ap  c  fp x19 */ \
-   { 1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  1, 1, 1}
+#define FIXED_REGISTERS \
+{ \
+ /*  r0  r1  r2  r3  r4  r5  r6  r7  r8  r9  r10 r11 r12 r13 r14 r15 */ \
+     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, \
+ /*  r16 r17 r18 r19 r20 r21 r22 r23 gp  sp  lr  ?ap ?fp ?cc         */ \
+     0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  0,  1,  1,  1 \
+}
+
 
 /* 1 for registers not available across function calls.
    These must include the FIXED_REGISTERS and also any
@@ -191,13 +200,12 @@ extern char * mcore_current_function_name;
 /* RBE: r15 {link register} not available across calls,
    But we don't mark it that way here....  */
 #define CALL_USED_REGISTERS \
- /*  r0  r1  r2  r3  r4  r5  r6  r7  r8  r9  r10 r11 r12 r13 r14 r15 ap  c   fp x19 */ \
-   { 1,  1,  1,  1,  1,  1,  1,  1,  0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1, 1}
-
-/* The order in which register should be allocated.  */
-#define REG_ALLOC_ORDER  \
- /* r7  r6  r5  r4  r3  r2  r15 r14 r13 r12 r11 r10  r9  r8  r1  r0  ap  c   fp x19*/ \
-  {  7,  6,  5,  4,  3,  2,  15, 14, 13, 12, 11, 10,  9,  8,  1,  0, 16, 17, 18, 19}
+{ \
+ /*  r0  r1  r2  r3  r4  r5  r6  r7  r8  r9  r10 r11 r12 r13 r14 r15 */ \
+     1,  1,  1,  1,  1,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, \
+ /*  r16 r17 r18 r19 r20 r21 r22 r23 gp  sp  lr  ?ap ?fp ?cc         */ \
+     0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1,  1,  1 \
+}
 
 /* Return number of consecutive hard regs needed starting at reg REGNO
    to hold something of mode MODE.
@@ -267,32 +275,46 @@ extern char * mcore_current_function_name;
    For any two classes, it is very desirable that there be another
    class that represents their union.  */
 
+/* The VideoCore has several interesting register classes:
+ *
+ *  - fast registers, r0-r15; these get abbreviated instruction encodings.
+ *  - stackable registers, r0, r6, r16, r24; these can be used with push/pop.
+ *  - offsetable registers, r0, gp, sp; these have fast relative load/store encodings.
+ */
+
 /* The MCore has only general registers. There are
    also some special purpose registers: the T bit register, the
    procedure Link and the Count Registers.  */
 enum reg_class
 {
   NO_REGS,
+  FAST_REGS,
+  STACKABLE_REGS,
+  OFFSETABLE_REGS,
+
   ONLYR1_REGS,
   LRW_REGS,
   GENERAL_REGS,
   C_REGS,
   ALL_REGS,
-  LIM_REG_CLASSES
-};
 
-#define N_REG_CLASSES  (int) LIM_REG_CLASSES
+  LIM_REG_CLASSES,
+  N_REG_CLASSES = LIM_REG_CLASSES
+};
 
 
 /* Give names of register classes as strings for dump file.  */
-#define REG_CLASS_NAMES  \
-{			\
-  "NO_REGS",		\
-  "ONLYR1_REGS",	\
-  "LRW_REGS",		\
-  "GENERAL_REGS",	\
-  "C_REGS",		\
-  "ALL_REGS",		\
+#define REG_CLASS_NAMES \
+{ \
+  "NO_REGS", \
+  "FAST_REGS", \
+  "STACKABLE_REGS", \
+  "OFFSETABLE_REGS", \
+  "ONLYR1_REGS", \
+  "LRW_REGS", \
+  "GENERAL_REGS", \
+  "C_REGS", \
+  "ALL_REGS", \
 }
 
 /* Define which registers fit in which classes.
@@ -300,14 +322,17 @@ enum reg_class
    of length N_REG_CLASSES.  */
 
 /* ??? STACK_POINTER_REGNUM should be excluded from LRW_REGS.  */
-#define REG_CLASS_CONTENTS      	\
-{					\
-  {0x000000},  /* NO_REGS       */	\
-  {0x000002},  /* ONLYR1_REGS   */	\
+#define REG_CLASS_CONTENTS \
+{ \
+  {0x00000000},  /* NO_REGS */ \
+  {0x0000ffff},  /* FAST_REGS */ \
+  {0x01010041},  /* STACKABLE_REGS */ \
+  {0x03000001},  /* OFFSETABLE_REGS */ \
+  {0x000002},  /* ONLYR1_REGS */ \
   {0x007FFE},  /* LRW_REGS      */	\
-  {0x01FFFF},  /* GENERAL_REGS  */	\
+  {0x00ffffff},  /* GENERAL_REGS  */	\
   {0x020000},  /* C_REGS        */	\
-  {0x0FFFFF}   /* ALL_REGS      */	\
+  {0x3fffffff}   /* ALL_REGS      */	\
 }
 
 /* The same information, inverted:
@@ -370,8 +395,8 @@ extern const enum reg_class regno_reg_class[FIRST_PSEUDO_REGISTER];
 /* Define the number of register that can hold parameters.
    These two macros are used only in other macro definitions below.  */
 #define NPARM_REGS 6
-#define FIRST_PARM_REG 2
-#define FIRST_RET_REG 2
+#define FIRST_PARM_REG 0
+#define FIRST_RET_REG 0
 
 /* Define this if pushing a word on the stack
    makes the stack pointer a smaller address.  */
@@ -651,7 +676,7 @@ extern const enum reg_class regno_reg_class[FIRST_PSEUDO_REGISTER];
 #undef  TARGET_ASM_NAMED_SECTION
 #define TARGET_ASM_NAMED_SECTION  mcore_asm_named_section
 
-#define INCOMING_RETURN_ADDR_RTX gen_rtx_REG (SImode, LK_REG)
+#define INCOMING_RETURN_ADDR_RTX gen_rtx_REG (SImode, LR_REG)
 
 /* This is how to output an insn to push a register on the stack.
    It need not be very fast code.  */
