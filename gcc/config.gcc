@@ -3053,6 +3053,11 @@ m32c-*-elf*)
 	c_target_objs="m32c-pragma.o"
 	cxx_target_objs="m32c-pragma.o"
  	;;
+vc4-*-elf*)
+	tm_file="dbxelf.h elfos.h newlib-stdint.h ${tm_file} vc4/vc4-elf.h"
+	tmake_file=vc4/t-vc4
+	inhibit_libc=true
+	;;
 *)
 	echo "*** Configuration ${target} not supported" 1>&2
 	exit 1

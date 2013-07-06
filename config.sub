@@ -356,6 +356,11 @@ case $basic_machine in
 		basic_machine=armel-unknown
 		;;
 
+	vc4)
+		basic_machine=vc4-unknown
+		os=-elf
+		;;
+
 	# We use `pc' rather than `unknown'
 	# because (1) that's what they normally are, and
 	# (2) the word "unknown" tends to confuse beginning users.
@@ -443,6 +448,7 @@ case $basic_machine in
 	| ubicom32-* \
 	| v850-* | v850e-* | v850e1-* | v850es-* | v850e2-* | v850e2v3-* \
 	| vax-* \
+	| vc4-* \
 	| visium-* \
 	| we32k-* \
 	| x86-* | x86_64-* | xc16x-* | xps100-* \
