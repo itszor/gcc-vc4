@@ -37,12 +37,8 @@ static const struct default_options mcore_option_optimization_table[] =
     { OPT_LEVELS_ALL, OPT_fcaller_saves, NULL, 0 },
     { OPT_LEVELS_ALL, OPT_fschedule_insns, NULL, 0 },
     { OPT_LEVELS_ALL, OPT_fschedule_insns2, NULL, 0 },
-    { OPT_LEVELS_SIZE, OPT_mhardlit, NULL, 0 },
     { OPT_LEVELS_NONE, 0, NULL, 0 }
   };
-
-#undef  TARGET_DEFAULT_TARGET_FLAGS
-#define TARGET_DEFAULT_TARGET_FLAGS	TARGET_DEFAULT
 
 #undef TARGET_OPTION_OPTIMIZATION_TABLE
 #define TARGET_OPTION_OPTIMIZATION_TABLE mcore_option_optimization_table

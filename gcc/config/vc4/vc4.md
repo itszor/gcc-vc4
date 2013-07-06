@@ -354,24 +354,6 @@
     operands[2] = copy_to_mode_reg (SImode, operands[2]);
 }")
 
-(define_insn ""
-  [(set (match_operand:SI 0 "mcore_arith_reg_operand" "=r,r,r,r")
-	(and:SI (match_operand:SI 1 "mcore_arith_reg_operand" "0,0,r,0")
-		(match_operand:SI 2 "mcore_arith_any_imm_operand" "r,K,0,S")))]
-  "TARGET_RELAX_IMM"
-  "*
-{
-   switch (which_alternative)
-     {
-     case 0: return \"and	%0,%2\";
-     case 1: return \"andi	%0,%2\";
-     case 2: return \"and	%0,%1\";
-     /* case -1: return \"bclri	%0,%Q2\";	 will not happen */
-     case 3: return mcore_output_bclri (operands[0], INTVAL (operands[2]));
-     default: gcc_unreachable ();
-     }
-}")
-
 ;; This was the old "S" which was "!(2^n)" */
 ;; case -1: return \"bclri	%0,%Q2\";	 will not happen */
 
@@ -379,7 +361,7 @@
   [(set (match_operand:SI 0 "mcore_arith_reg_operand" "=r,r,r,r")
 	(and:SI (match_operand:SI 1 "mcore_arith_reg_operand" "0,0,r,0")
 		(match_operand:SI 2 "mcore_arith_K_S_operand" "r,K,0,S")))]
-  "!TARGET_RELAX_IMM"
+  ""
   "*
 {
    switch (which_alternative)
@@ -414,24 +396,8 @@
 (define_insn ""
   [(set (match_operand:SI 0 "mcore_arith_reg_operand" "=r,r,r")
 	(ior:SI (match_operand:SI 1 "mcore_arith_reg_operand" "%0,0,0")
-		(match_operand:SI 2 "mcore_arith_any_imm_operand" "r,M,T")))]
-  "TARGET_RELAX_IMM"
-  "*
-{
-   switch (which_alternative)
-     {
-     case 0: return \"or	%0,%2\";
-     case 1: return \"bseti	%0,%P2\";
-     case 2: return mcore_output_bseti (operands[0], INTVAL (operands[2]));
-     default: gcc_unreachable ();
-     }
-}")
-
-(define_insn ""
-  [(set (match_operand:SI 0 "mcore_arith_reg_operand" "=r,r,r")
-	(ior:SI (match_operand:SI 1 "mcore_arith_reg_operand" "%0,0,0")
 		(match_operand:SI 2 "mcore_arith_M_operand" "r,M,T")))]
-  "!TARGET_RELAX_IMM"
+  ""
   "*
 {
    switch (which_alternative)
@@ -948,7 +914,7 @@
   [(set (match_operand:SI 0 "mcore_arith_reg_operand" "")
         (div:SI (match_operand:SI 1 "mcore_arith_reg_operand" "")
                 (match_operand:SI 2 "mcore_arith_reg_operand" "")))]
-  "TARGET_DIV"
+  ""
   "")
  
 ;; MCORE Revision 1.50: restricts the divisor to be in r1. (6/97)
@@ -957,7 +923,7 @@
   [(set (match_operand:SI 0 "mcore_arith_reg_operand" "=r")
         (div:SI (match_operand:SI 1 "mcore_arith_reg_operand" "0")
                 (match_operand:SI 2 "mcore_arith_reg_operand" "b")))]
-  "TARGET_DIV"
+  ""
   "divs %0,%2")
 
 ;;
@@ -969,7 +935,7 @@
   [(set (match_operand:SI 0 "mcore_arith_reg_operand" "")
         (udiv:SI (match_operand:SI 1 "mcore_arith_reg_operand" "")
                  (match_operand:SI 2 "mcore_arith_reg_operand" "")))]
-  "TARGET_DIV"
+  ""
   "")
  
 ;; MCORE Revision 1.50: restricts the divisor to be in r1. (6/97)
@@ -977,7 +943,7 @@
   [(set (match_operand:SI 0 "mcore_arith_reg_operand" "=r")
         (udiv:SI (match_operand:SI 1 "mcore_arith_reg_operand" "0")
                  (match_operand:SI 2 "mcore_arith_reg_operand" "b")))]
-  "TARGET_DIV"
+  ""
   "divu %0,%2")
  
 ;; -------------------------------------------------------------------------
@@ -2362,22 +2328,6 @@
        /* 8-bit field, aligned properly, use the xtrb[0123]+sext sequence.  */
        /* not DONE, not FAIL, but let the RTL get generated....  */
     }
-  else if (TARGET_W_FIELD)
-    {
-      /* Arbitrary placement; note that the tree->rtl generator will make
-         something close to this if we return FAIL  */
-      rtx lshft = GEN_INT (32 - (INTVAL (operands[2]) + INTVAL (operands[3])));
-      rtx rshft = GEN_INT (32 - INTVAL (operands[2]));
-      rtx tmp1 = gen_reg_rtx (SImode);
-      rtx tmp2 = gen_reg_rtx (SImode);
-
-      emit_insn (gen_rtx_SET (SImode, tmp1, operands[1]));
-      emit_insn (gen_rtx_SET (SImode, tmp2,
-                         gen_rtx_ASHIFT (SImode, tmp1, lshft)));
-      emit_insn (gen_rtx_SET (SImode, operands[0],
-                         gen_rtx_ASHIFTRT (SImode, tmp2, rshft)));
-      DONE;
-    }
   else
     {
       /* Let the caller choose an alternate sequence.  */
@@ -2421,22 +2371,6 @@
         }
      emit_insn (gen_rtx_SET (SImode, operands[0],
                        gen_rtx_AND (SImode, shifted, mask)));
-     DONE;
-   }
- else if (TARGET_W_FIELD)
-   {
-     /* Arbitrary pattern; play shift/shift games to get it. 
-      * this is pretty much what the caller will do if we say FAIL */
-     rtx lshft = GEN_INT (32 - (INTVAL (operands[2]) + INTVAL (operands[3])));
-     rtx rshft = GEN_INT (32 - INTVAL (operands[2]));
-     rtx tmp1 = gen_reg_rtx (SImode);
-     rtx tmp2 = gen_reg_rtx (SImode);
-
-     emit_insn (gen_rtx_SET (SImode, tmp1, operands[1]));
-     emit_insn (gen_rtx_SET (SImode, tmp2,
-                         gen_rtx_ASHIFT (SImode, tmp1, lshft)));
-     emit_insn (gen_rtx_SET (SImode, operands[0],
-                       gen_rtx_LSHIFTRT (SImode, tmp2, rshft)));
      DONE;
    }
  else
@@ -2681,8 +2615,7 @@
         (match_operand:SI 1 "const_int_operand" ""))
    (set (match_operand:SI 2 "mcore_arith_reg_operand" "")
         (ior:SI (match_dup 2) (match_dup 0)))]
-  "TARGET_HARDLIT
-   && mcore_num_ones (INTVAL (operands[1])) == 2
+  "mcore_num_ones (INTVAL (operands[1])) == 2
    && mcore_is_dead (insn, operands[0])"
   "* return mcore_output_bseti (operands[2], INTVAL (operands[1]));")
 
@@ -2691,7 +2624,7 @@
         (match_operand:SI 1 "const_int_operand" ""))
    (set (match_operand:SI 2 "mcore_arith_reg_operand" "")
         (and:SI (match_dup 2) (match_dup 0)))]
-  "TARGET_HARDLIT && mcore_num_zeros (INTVAL (operands[1])) == 2 &&
+  "mcore_num_zeros (INTVAL (operands[1])) == 2 &&
        mcore_is_dead (insn, operands[0])"
   "* return mcore_output_bclri (operands[2], INTVAL (operands[1]));")
 
@@ -2951,13 +2884,6 @@
 ;; Stack allocation -- in particular, for alloca().
 ;; this is *not* what we use for entry into functions.
 ;;
-;; This is how we allocate stack space.  If we are allocating a
-;; constant amount of space and we know it is less than 4096
-;; bytes, we need do nothing.
-;;
-;; If it is more than 4096 bytes, we need to probe the stack
-;; periodically. 
-;;
 ;; operands[1], the distance is a POSITIVE number indicating that we
 ;; are allocating stack space
 ;;
@@ -2969,89 +2895,8 @@
         (match_dup 2))]
   ""
   "
-{
-  /* If he wants no probing, just do it for him.  */
-  if (mcore_stack_increment == 0)
-    {
-      emit_insn (gen_addsi3 (stack_pointer_rtx, stack_pointer_rtx,operands[1]));
-;;      emit_move_insn (operands[0], virtual_stack_dynamic_rtx);
-      DONE;
-    }
-
-  /* For small constant growth, we unroll the code.  */
-  if (GET_CODE (operands[1]) == CONST_INT
-      && INTVAL (operands[1]) < 8 * STACK_UNITS_MAXSTEP)
-    {
-      HOST_WIDE_INT left = INTVAL(operands[1]);
-
-      /* If it's a long way, get close enough for a last shot.  */
-      if (left >= STACK_UNITS_MAXSTEP)
-	{
-	  rtx tmp = gen_reg_rtx (Pmode);
-	  emit_insn (gen_movsi (tmp, GEN_INT (STACK_UNITS_MAXSTEP)));
-	  do
-	    {
-	      rtx memref = gen_rtx_MEM (SImode, stack_pointer_rtx);
-
-              MEM_VOLATILE_P (memref) = 1;
-	      emit_insn (gen_subsi3 (stack_pointer_rtx, stack_pointer_rtx, tmp));
-	      emit_insn (gen_movsi (memref, stack_pointer_rtx));
-	      left -= STACK_UNITS_MAXSTEP;
-	    }
-	  while (left > STACK_UNITS_MAXSTEP);
-	}
-      /* Perform the final adjustment.  */
-      emit_insn (gen_addsi3 (stack_pointer_rtx, stack_pointer_rtx, GEN_INT (-left)));
-;;      emit_move_insn (operands[0], virtual_stack_dynamic_rtx);
-      DONE;
-    }
-  else
-    {
-      rtx out_label = 0;
-      rtx loop_label = gen_label_rtx ();
-      rtx step = gen_reg_rtx (Pmode);
-      rtx tmp = gen_reg_rtx (Pmode);
-      rtx test, memref;
-
-#if 1
-      emit_insn (gen_movsi (tmp, operands[1]));
-      emit_insn (gen_movsi (step, GEN_INT (STACK_UNITS_MAXSTEP)));
-
-      if (GET_CODE (operands[1]) != CONST_INT)
-	{
-	  out_label = gen_label_rtx ();
-	  test = gen_rtx_GEU (VOIDmode, step, tmp);		/* quick out */
-	  emit_jump_insn (gen_cbranchsi4 (test, step, tmp, out_label));
-	}
-
-      /* Run a loop that steps it incrementally.  */
-      emit_label (loop_label);
-
-      /* Extend a step, probe, and adjust remaining count.  */
-      emit_insn(gen_subsi3(stack_pointer_rtx, stack_pointer_rtx, step));
-      memref = gen_rtx_MEM (SImode, stack_pointer_rtx);
-      MEM_VOLATILE_P (memref) = 1;
-      emit_insn(gen_movsi(memref, stack_pointer_rtx));
-      emit_insn(gen_subsi3(tmp, tmp, step));
-
-      /* Loop condition -- going back up.  */
-      test = gen_rtx_LTU (VOIDmode, step, tmp);
-      emit_jump_insn (gen_cbranchsi4 (test, step, tmp, loop_label));
-
-      if (out_label)
-	emit_label (out_label);
-
-      /* Bump the residual.  */
-      emit_insn (gen_subsi3 (stack_pointer_rtx, stack_pointer_rtx, tmp));
-;;      emit_move_insn (operands[0], virtual_stack_dynamic_rtx);
-      DONE;
-#else
-      /* simple one-shot -- ensure register and do a subtract.
-       * This does NOT comply with the ABI.  */
-      emit_insn (gen_movsi (tmp, operands[1]));
-      emit_insn (gen_subsi3 (stack_pointer_rtx, stack_pointer_rtx, tmp));
-;;      emit_move_insn (operands[0], virtual_stack_dynamic_rtx);
-      DONE;
-#endif
-    }
-}")
+    emit_insn (gen_addsi3 (stack_pointer_rtx, stack_pointer_rtx,operands[1]));
+;;  emit_move_insn (operands[0], virtual_stack_dynamic_rtx);
+    DONE;
+  "
+)

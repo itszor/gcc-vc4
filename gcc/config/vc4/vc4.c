@@ -237,27 +237,6 @@ struct gcc_target targetm = TARGET_INITIALIZER;
 static void
 output_stack_adjust (int direction, int size)
 {
-  /* If extending stack a lot, we do it incrementally.  */
-  if (direction < 0 && size > mcore_stack_increment && mcore_stack_increment > 0)
-    {
-      rtx tmp = gen_rtx_REG (SImode, 1);
-      rtx memref;
-
-      emit_insn (gen_movsi (tmp, GEN_INT (mcore_stack_increment)));
-      do
-	{
-	  emit_insn (gen_subsi3 (stack_pointer_rtx, stack_pointer_rtx, tmp));
-	  memref = gen_rtx_MEM (SImode, stack_pointer_rtx);
-	  MEM_VOLATILE_P (memref) = 1;
-	  emit_insn (gen_movsi (memref, stack_pointer_rtx));
-	  size -= mcore_stack_increment;
-	}
-      while (size > mcore_stack_increment);
-
-      /* SIZE is now the residual for the last adjustment,
-	 which doesn't require a probe.  */
-    }
-
   if (size)
     {
       rtx insn;
@@ -477,9 +456,6 @@ mcore_and_cost (rtx x)
   /* Takes one instruction to load.  */
   else if (const_ok_for_mcore (val))
     return 3;
-  /* Takes two instructions to load.  */
-  else if (TARGET_HARDLIT && mcore_const_ok_for_inline (val))
-    return 4;
 
   /* Takes a lrw to load.  */
   return 5;
@@ -503,10 +479,7 @@ mcore_ior_cost (rtx x)
   /* Takes one instruction to load.  */
   else if (const_ok_for_mcore (val))
     return 3;
-  /* Takes two instructions to load.  */
-  else if (TARGET_HARDLIT && mcore_const_ok_for_inline (val))
-    return 4;
-  
+
   /* Takes a lrw to load.  */
   return 5;
 }
@@ -690,27 +663,10 @@ mcore_output_call (rtx operands[], int index)
   
   if (REG_P (addr))
     {
-      if (TARGET_CG_DATA)
-	{
-	  gcc_assert (mcore_current_function_name);
-	  
-	  ASM_OUTPUT_CG_EDGE (asm_out_file, mcore_current_function_name,
-			      "unknown", 1);
-	}
-
       sprintf (buffer, "jsr\t%%%d", index);
     }
   else
     {
-      if (TARGET_CG_DATA)
-	{
-	  gcc_assert (mcore_current_function_name);
-	  gcc_assert (GET_CODE (addr) == SYMBOL_REF);
-	  
-	  ASM_OUTPUT_CG_EDGE (asm_out_file, mcore_current_function_name,
-			      XSTR (addr, 0), 0);
-	}
-      
       sprintf (buffer, "jbsr\t%%%d", index);
     }
 
@@ -775,118 +731,10 @@ mcore_const_trick_uses_not (HOST_WIDE_INT value)
 static int
 try_constant_tricks (HOST_WIDE_INT value, HOST_WIDE_INT * x, HOST_WIDE_INT * y)
 {
-  HOST_WIDE_INT i;
-  unsigned HOST_WIDE_INT bit, shf, rot;
-
+  (void) x;
+  (void) y;
   if (const_ok_for_mcore (value))
     return 1;	/* Do the usual thing.  */
-  
-  if (! TARGET_HARDLIT) 
-    return 0;
-
-  if (const_ok_for_mcore (~value))
-    {
-      *x = ~value;
-      return 2;
-    }
-
-  for (i = 1; i <= 32; i++)
-    {
-      if (const_ok_for_mcore (value - i))
-	{
-	  *x = value - i;
-	  *y = i;
-
-	  return 3;
-	}
-
-      if (const_ok_for_mcore (value + i))
-	{
-	  *x = value + i;
-	  *y = i;
-
-	  return 4;
-	}
-    }
-
-  bit = 0x80000000ULL;
-
-  for (i = 0; i <= 31; i++)
-    {
-      if (const_ok_for_mcore (i - value))
-	{
-	  *x = i - value;
-	  *y = i;
-
-	  return 5;
-	}
-
-      if (const_ok_for_mcore (value & ~bit))
-	{
-	  *y = bit;
-	  *x = value & ~bit;
-	  return 6;
-	}
-
-      if (const_ok_for_mcore (value | bit))
-	{
-	  *y = ~bit;
-	  *x = value | bit;
-
-	  return 7;
-	}
-
-      bit >>= 1;
-    }
-
-  shf = value;
-  rot = value;
-
-  for (i = 1; i < 31; i++)
-    {
-      int c;
-
-      /* MCore has rotate left.  */
-      c = rot << 31;
-      rot >>= 1;
-      rot &= 0x7FFFFFFF;
-      rot |= c;   /* Simulate rotate.  */
-
-      if (const_ok_for_mcore (rot))
-	{
-	  *y = i;
-	  *x = rot;
-
-	  return 8;
-	}
-
-      if (shf & 1)
-	shf = 0;	/* Can't use logical shift, low order bit is one.  */
-
-      shf >>= 1;
-
-      if (shf != 0 && const_ok_for_mcore (shf))
-	{
-	  *y = i;
-	  *x = shf;
-
-	  return 9;
-	}
-    }
-
-  if ((value % 3) == 0 && const_ok_for_mcore (value / 3))
-    {
-      *x = value / 3;
-
-      return 10;
-    }
-
-  if ((value % 5) == 0 && const_ok_for_mcore (value / 5))
-    {
-      *x = value / 5;
-
-      return 11;
-    }
   
   return 0;
 }
@@ -1436,7 +1284,6 @@ mcore_expand_insv (rtx operands[])
   int width = INTVAL (operands[1]);
   int posn = INTVAL (operands[2]);
   int mask;
-  rtx mreg, sreg, ereg;
 
   /* To get width 1 insv, the test in store_bit_field() (expmed.c, line 191)
      for width==1 must be removed.  Look around line 368.  This is something
@@ -1461,71 +1308,7 @@ mcore_expand_insv (rtx operands[])
       return 1;
     }
 
-  /* Look at some bit-field placements that we aren't interested
-     in handling ourselves, unless specifically directed to do so.  */
-  if (! TARGET_W_FIELD)
-    return 0;		/* Generally, give up about now.  */
-
-  if (width == 8 && posn % 8 == 0)
-    /* Byte sized and aligned; let caller break it up.  */
-    return 0;
-  
-  if (width == 16 && posn % 16 == 0)
-    /* Short sized and aligned; let caller break it up.  */
-    return 0;
-
-  /* The general case - we can do this a little bit better than what the
-     machine independent part tries.  This will get rid of all the subregs
-     that mess up constant folding in combine when working with relaxed
-     immediates.  */
-
-  /* If setting the entire field, do it directly.  */
-  if (GET_CODE (operands[3]) == CONST_INT
-      && INTVAL (operands[3]) == ((1 << width) - 1))
-    {
-      mreg = force_reg (SImode, GEN_INT (INTVAL (operands[3]) << posn));
-      emit_insn (gen_rtx_SET (SImode, operands[0],
-                         gen_rtx_IOR (SImode, operands[0], mreg)));
-      return 1;
-    }
-
-  /* Generate the clear mask.  */
-  mreg = force_reg (SImode, GEN_INT (~(((1 << width) - 1) << posn)));
-
-  /* Clear the field, to overlay it later with the source.  */
-  emit_insn (gen_rtx_SET (SImode, operands[0], 
-		      gen_rtx_AND (SImode, operands[0], mreg)));
-
-  /* If the source is constant 0, we've nothing to add back.  */
-  if (GET_CODE (operands[3]) == CONST_INT && INTVAL (operands[3]) == 0)
-    return 1;
-
-  /* XXX: Should we worry about more games with constant values?
-     We've covered the high profile: set/clear single-bit and many-bit
-     fields. How often do we see "arbitrary bit pattern" constants?  */
-  sreg = copy_to_mode_reg (SImode, operands[3]);
-
-  /* Extract src as same width as dst (needed for signed values).  We
-     always have to do this since we widen everything to SImode.
-     We don't have to mask if we're shifting this up against the
-     MSB of the register (e.g., the shift will push out any hi-order
-     bits.  */
-  if (width + posn != (int) GET_MODE_SIZE (SImode))
-    {
-      ereg = force_reg (SImode, GEN_INT ((1 << width) - 1));      
-      emit_insn (gen_rtx_SET (SImode, sreg,
-                          gen_rtx_AND (SImode, sreg, ereg)));
-    }
-
-  /* Insert source value in dest.  */
-  if (posn != 0)
-    emit_insn (gen_rtx_SET (SImode, sreg,
-		        gen_rtx_ASHIFT (SImode, sreg, GEN_INT (posn))));
-  
-  emit_insn (gen_rtx_SET (SImode, operands[0],
-		      gen_rtx_IOR (SImode, operands[0], sreg)));
-
-  return 1;
+  return 0;		/* Generally, give up about now.  */
 }
 
 /* ??? Block move stuff stolen from m88k.  This code has not been
@@ -1952,40 +1735,6 @@ mcore_expand_prolog (void)
   
   space_allocated = fi.arg_size + fi.reg_size + fi.local_size +
     fi.outbound_size + fi.pad_outbound + fi.pad_local + fi.pad_reg;
-
-  if (TARGET_CG_DATA)
-    {
-      /* Emit a symbol for this routine's frame size.  */
-      rtx x;
-
-      x = DECL_RTL (current_function_decl);
-      
-      gcc_assert (GET_CODE (x) == MEM);
-      
-      x = XEXP (x, 0);
-      
-      gcc_assert (GET_CODE (x) == SYMBOL_REF);
-      
-      free (mcore_current_function_name);
-      
-      mcore_current_function_name = xstrdup (XSTR (x, 0));
-      
-      ASM_OUTPUT_CG_NODE (asm_out_file, mcore_current_function_name, space_allocated);
-
-      if (cfun->calls_alloca)
-	ASM_OUTPUT_CG_EDGE (asm_out_file, mcore_current_function_name, "alloca", 1);
-
-      /* 970425: RBE:
-         We're looking at how the 8byte alignment affects stack layout
-         and where we had to pad things. This emits information we can
-         extract which tells us about frame sizes and the like.  */
-      fprintf (asm_out_file,
-	       "\t.equ\t__$frame$info$_%s_$_%d_%d_x%x_%d_%d_%d,0\n",
-	       mcore_current_function_name,
-	       fi.arg_size, fi.reg_size, fi.reg_mask,
-	       fi.local_size, fi.outbound_size,
-	       frame_pointer_needed);
-    }
 
   if (mcore_naked_function_p ())
     return;
@@ -2672,9 +2421,6 @@ mcore_is_same_reg (rtx x, rtx y)
 static void
 mcore_option_override (void)
 {
-  /* Only the m340 supports little endian code.  */
-  if (TARGET_LITTLE_END && ! TARGET_M340)
-    target_flags |= MASK_M340;
 }
 
 
