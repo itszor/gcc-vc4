@@ -217,7 +217,7 @@
 	 into a register.  Thus, this predicate should indicate that they are valid,
 	 and the constraint in mcore.md should control whether an additional load to
 	 register is needed. (see mcore.md, addsi). -- DAC 4/2/1998
-      
+
       if (CONST_OK_FOR_J (INTVAL (op)) || CONST_OK_FOR_L (INTVAL (op)))
         return 1;
 

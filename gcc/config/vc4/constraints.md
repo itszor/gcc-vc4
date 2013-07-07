@@ -18,23 +18,20 @@
 ;; <http://www.gnu.org/licenses/>.
 
 ;; Register constraints.
-(define_register_constraint "a" "LRW_REGS"
+(define_register_constraint "f" "FAST_REGS"
   "@internal")
 
-(define_register_constraint "b" "ONLYR1_REGS"
+(define_register_constraint "b" "STACKABLE_REGS"
   "@internal")
 
-(define_register_constraint "c" "C_REGS"
-  "@internal")
-
-(define_register_constraint "x" "ALL_REGS"
+(define_register_constraint "c" "OFFSETABLE_REGS"
   "@internal")
 
 ;; Integer constraints.
 (define_constraint "I"
-  "An integer in the range 0 to 127."
+  "A 5-bit unsigned integer in the range 0 to 31."
   (and (match_code "const_int")
-       (match_test "IN_RANGE (ival, 0, 127)")))
+       (match_test "IN_RANGE (ival, 0, 31)")))
 
 (define_constraint "J"
   "An integer in the range 1 to 32."
