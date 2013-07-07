@@ -111,7 +111,7 @@ static tree       mcore_handle_naked_attribute  (tree *, tree, tree, int, bool *
 static void	  mcore_asm_named_section       (const char *,
 						 unsigned int, tree);
 #endif
-static void       mcore_print_operand           (FILE *, rtx, int);
+static void       vc4_print_operand             (FILE *, rtx, int);
 static void       mcore_print_operand_address   (FILE *, rtx);
 static bool       mcore_print_operand_punct_valid_p (unsigned char code);
 static void       mcore_unique_section	        (tree, int);
@@ -171,7 +171,7 @@ static const struct attribute_spec mcore_attribute_table[] =
 #endif
 
 #undef  TARGET_PRINT_OPERAND
-#define TARGET_PRINT_OPERAND		mcore_print_operand
+#define TARGET_PRINT_OPERAND		vc4_print_operand
 #undef  TARGET_PRINT_OPERAND_ADDRESS
 #define TARGET_PRINT_OPERAND_ADDRESS	mcore_print_operand_address
 #undef  TARGET_PRINT_OPERAND_PUNCT_VALID_P
@@ -337,6 +337,7 @@ mcore_print_operand_punct_valid_p (unsigned char code)
 
    'R'  print the next register or memory location along, i.e. the lsw in
         a double word value
+   'C'  print a constant with the #
    'O'  print a constant without the #
    'M'  print a constant as its negative
    'P'  print log2 of a power of two
@@ -345,7 +346,7 @@ mcore_print_operand_punct_valid_p (unsigned char code)
    'X'  print byte number for xtrbN instruction.  */
 
 static void
-mcore_print_operand (FILE * stream, rtx x, int code)
+vc4_print_operand (FILE * stream, rtx x, int code)
 {
   switch (code)
     {
@@ -360,6 +361,9 @@ mcore_print_operand (FILE * stream, rtx x, int code)
       break;
     case 'Q':
       fprintf (asm_out_file, "%d", exact_log2 (~INTVAL (x)));
+      break;
+    case 'C':
+      fprintf (asm_out_file, "#" HOST_WIDE_INT_PRINT_DEC, INTVAL (x));
       break;
     case 'O':
       fprintf (asm_out_file, HOST_WIDE_INT_PRINT_DEC, INTVAL (x));
@@ -1765,6 +1769,7 @@ mcore_expand_prolog (void)
   if (growth < fi.reg_growth)
     output_stack_adjust (-1, fi.growth[growth++]);		/* Grows it.  */
 
+#if 0 // FIXME
   if (fi.reg_size != 0)
     {
       int i;
@@ -1798,6 +1803,7 @@ mcore_expand_prolog (void)
 	    }
         }
     }
+#endif
 
   /* Figure the locals + outbounds.  */
   if (frame_pointer_needed)
@@ -1860,7 +1866,8 @@ mcore_expand_epilog (void)
     output_stack_adjust ( 1, fi.growth[growth--]);
   
   offs = fi.reg_offset;
-  
+
+#if 0
   for (i = 15; i >= 0; i--)
     {
       if (offs == 0 && i == 15 && ((fi.reg_mask & 0xc000) == 0xc000))
@@ -1892,6 +1899,7 @@ mcore_expand_epilog (void)
 	  offs += 4;
 	}
     }
+#endif
 
   /* Give back anything else.  */
   /* XXX: Should accumulate total and then give it back.  */
@@ -2072,6 +2080,7 @@ emit_new_cond_insn (rtx insn, int cond)
   rtx pat, dst, src;
   cond_type num;
 
+#if 0 // FIXME
   if ((num = is_cond_candidate (insn)) == COND_NO)
     return NULL;
 
@@ -2149,6 +2158,7 @@ emit_new_cond_insn (rtx insn, int cond)
     c_insn = emit_insn_after (c_insn, insn);
 
   delete_insn (insn);
+#endif
   
   return c_insn;
 }
