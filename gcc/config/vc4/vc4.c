@@ -140,6 +140,9 @@ static void       mcore_trampoline_init		(rtx, tree, rtx);
 static bool       mcore_warn_func_return        (tree);
 static void       mcore_option_override		(void);
 static bool       mcore_legitimate_constant_p   (enum machine_mode, rtx);
+
+static int        vc4_target_register_move_cost(enum machine_mode mode, reg_class_t from, reg_class_t to);
+static int        vc4_target_memory_move_cost(enum machine_mode mode, reg_class_t rclass, bool in);
 
 /* MCore specific attributes.  */
 
@@ -231,8 +234,41 @@ static const struct attribute_spec mcore_attribute_table[] =
 #undef TARGET_WARN_FUNC_RETURN
 #define TARGET_WARN_FUNC_RETURN mcore_warn_func_return
 
+#undef TARGET_LRA_P
+#define TARGET_LRA_P hook_bool_void_true
+
+#if 0
+#undef TARGET_REGISTER_MOVE_COST
+#define TARGET_REGISTER_MOVE_COST       vc4_target_register_move_cost
+
+#undef TARGET_MEMORY_MOVE_COST
+#define TARGET_MEMORY_MOVE_COST         vc4_target_memory_move_cost
+#endif
+
 struct gcc_target targetm = TARGET_INITIALIZER;
 
+
+/* Compute cost of moving data between one register class
+   and another. Fast registers are cheap, everything else is expensive. */
+static int
+vc4_target_register_move_cost(enum machine_mode mode, reg_class_t from, reg_class_t to)
+{
+  if ((from == FAST_REGS) && (to == FAST_REGS))
+    return 2;
+  return 4;
+}
+
+/* Compute extra cost (over TARGET_REGISTER_MOVE_COST) to do memory
+ * indirections. All memory operations cost 4, so we need an extra 2 for
+ * fast registers. */
+static int
+vc4_target_memory_move_cost(enum machine_mode mode, reg_class_t rclass, bool in)
+{
+  if (rclass == FAST_REGS)
+    return 2;
+  return 0;
+}
+
 /* Adjust the stack and return the number of bytes taken to do it.  */
 static void
 output_stack_adjust (int direction, int size)

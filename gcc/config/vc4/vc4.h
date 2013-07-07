@@ -603,7 +603,7 @@ extern const enum reg_class regno_reg_class[FIRST_PSEUDO_REGISTER];
    for the index in the tablejump instruction.  */
 #define CASE_VECTOR_MODE SImode
 
-/* 'char' is signed by default.  */
+/* 'char' is unsigned by default.  */
 #define DEFAULT_SIGNED_CHAR  0
 
 #undef SIZE_TYPE
@@ -630,7 +630,7 @@ extern const enum reg_class regno_reg_class[FIRST_PSEUDO_REGISTER];
    will either zero-extend or sign-extend.  The value of this macro should
    be the code that says which one of the two operations is implicitly
    done, UNKNOWN if none.  */
-#define LOAD_EXTEND_OP(MODE) ZERO_EXTEND
+#define LOAD_EXTEND_OP(MODE) UNKNOWN
 
 /* Nonzero if access to memory by bytes is slow and undesirable.  */
 #define SLOW_BYTE_ACCESS 0
@@ -653,10 +653,6 @@ extern const enum reg_class regno_reg_class[FIRST_PSEUDO_REGISTER];
 /* The machine modes of pointers and functions.  */
 #define Pmode          SImode
 #define FUNCTION_MODE  Pmode
-
-/* Compute extra cost of moving data between one register class
-   and another.  All register moves are cheap.  */
-#define REGISTER_MOVE_COST(MODE, SRCCLASS, DSTCLASS) 2
 
 #define WORD_REGISTER_OPERATIONS
 

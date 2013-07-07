@@ -98,9 +98,9 @@
        (match_test "mcore_num_zeros (ival) <= 2")))
 
 (define_constraint "T"
-  "An integer constant with 2 set bits."
+  "The integer constant two."
   (and (match_code "const_int")
-       (match_test "mcore_num_ones (ival) == 2")))
+       (match_test "ival == 2")))
 
 (define_constraint "U"
   "The integer constant zero."
