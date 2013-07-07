@@ -36,15 +36,121 @@
 
 ;; --- Moves ----------------------------------------------------------------
 
-(define_insn "movsi"
-  [(set (match_operand:SI 0 "nonimmediate_operand" "=f,f,r")
-	(match_operand:SI 1 "general_operand" "f,I,r"))]
+(define_expand "movsi"
+  [
+    (set
+      (match_operand:SI 0 "general_operand" "")
+      (match_operand:SI 1 "general_operand" "")
+    )
+  ]
+  ""
+  ""
+)
+
+(define_expand "movqi"
+  [
+    (set
+      (match_operand:QI 0 "general_operand" "")
+      (match_operand:QI 1 "general_operand" "")
+    )
+  ]
+  ""
+  ""
+)
+
+(define_insn "*vc4_movsi"
+  [
+    (set
+      (match_operand:SI 0 "nonimmediate_operand" "+f,f,r,f,r")
+      (match_operand:SI 1 "general_operand" "f,I,r,m,m")
+    )
+  ]
   ""
   "@
   	mov %0, %1
   	mov %0, %C1
+  	mov %0, %1
+  	ld %0, %1
+  	ld %0, %1"
+  [(set_attr "length" "2,2,4,2,4")]
+)
+
+(define_insn "*vc4_qi_constants"
+  [
+    (set
+      (match_operand:QI 0 "nonimmediate_operand" "+f")
+      (match_operand:QI 1 "const_int_operand" "I")
+    )
+  ]
+  ""
+  "@
+  	mov %0, %C1"
+  [(set_attr "length" "2")]
+)
+
+(define_insn "*vc4_qi_moves"
+  [
+    (set
+      (match_operand:QI 0 "nonimmediate_operand" "+f,r")
+      (match_operand:QI 1 "register_operand" "f,r")
+    )
+  ]
+  ""
+  "@
+  	mov %0, %1
   	mov %0, %1"
-  [(set_attr "length" "2,2,4")]
+  [(set_attr "length" "2,4")]
+)
+
+(define_insn "*vc4_load_qi"
+  [
+    (set
+      (match_operand:QI 0 "nonimmediate_operand" "+f,r")
+      (match_operand:QI 1 "memory_operand" "m,m")
+    )
+  ]
+  ""
+  "@
+  	ldb %0, %1
+  	ldb %0, %1"
+  [(set_attr "length" "2,4")]
+)
+
+(define_insn "*vc4_indexed_load_si"
+  [
+    (set
+      (match_operand:SI 0 "nonimmediate_operand" "+r")
+      (mem:SI
+	(plus:SI
+	  (match_operand:SI 1 "register_operand" "%r")
+	  (mult:SI
+	    (match_operand:SI 2 "register_operand" "r")
+	    (const_int:SI 4)
+	  )
+	)
+      )
+    )
+  ]
+  ""
+  "ld %0, (%1, %2)"
+  [(set_attr "length" "4")]
+)
+
+(define_insn "*vc4_indexed_load_qi"
+  [
+    (set
+      (match_operand:QI 0 "nonimmediate_operand" "+r")
+      (mem:QI
+	(plus:SI
+	  (match_operand:SI 1 "" "%r")
+	  (match_operand:SI 2 "" "r")
+	)
+      )
+    )
+  ]
+  ""
+  "ldb %0, (%1, %2)"
+  [(set_attr "length" "4")]
 )
 
 ;; --- Arithmetic -----------------------------------------------------------
@@ -59,7 +165,7 @@
   	add %0, %C2
   	add %0, %1, %2
   	add %0, %1, %C2"
-  [(set_attr "length" "2, 2, 4, 4")]
+  [(set_attr "length" "2,2,4,4")]
 )
 
 (define_insn "subsi3"
@@ -69,6 +175,62 @@
   ""
   "sub %0, %1, %2"
   [(set_attr "length" "4")]
+)
+
+(define_insn "ashlsi3"
+  [
+    (set
+      (match_operand:SI 0 "" "+f,f,r,r")
+      (ashift:SI
+        (match_operand:SI 1 "" "%0,0,r,r")
+	(match_operand:SI 2 "" "f,I,r,I")
+      )
+    )
+  ]
+  ""
+  "@
+  	lsl %0, %2
+  	lsl %0, %C2
+  	lsl %0, %1, %2
+  	lsl %0, %1, %C2"
+  [(set_attr "length" "2,2,4,4")]
+)
+
+(define_insn "lshrsi3"
+  [
+    (set
+      (match_operand:SI 0 "" "+f,f,r,r")
+      (lshiftrt:SI
+        (match_operand:SI 1 "" "%0,0,r,r")
+	(match_operand:SI 2 "" "f,I,r,I")
+      )
+    )
+  ]
+  ""
+  "@
+  	lsr %0, %2
+  	lsr %0, %C2
+  	lsr %0, %1, %2
+  	lsr %0, %1, %C2"
+  [(set_attr "length" "2,2,4,4")]
+)
+
+;; --- Sign extension -------------------------------------------------------
+
+(define_insn "zero_extendqisi2"
+  [
+    (set
+      (match_operand:SI 0 "register_operand" "+f,r")
+      (zero_extend:SI
+        (match_operand:QI 1 "register_operand" "0,r")
+      )
+    )
+  ]
+  ""
+  "@
+    	extu %0, #8
+    	extu %0, %1, #8"
+  [(set_attr "length" "2,4")]
 )
 
 ;; --- Jumps ----------------------------------------------------------------
