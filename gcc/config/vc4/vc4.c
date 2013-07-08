@@ -190,10 +190,14 @@ static const struct attribute_spec mcore_attribute_table[] =
 #define TARGET_ENCODE_SECTION_INFO 	mcore_encode_section_info
 #undef  TARGET_STRIP_NAME_ENCODING
 #define TARGET_STRIP_NAME_ENCODING	mcore_strip_name_encoding
+
+#if 0
 #undef  TARGET_RTX_COSTS
 #define TARGET_RTX_COSTS 		mcore_rtx_costs
 #undef  TARGET_ADDRESS_COST
 #define TARGET_ADDRESS_COST 		hook_int_rtx_mode_as_bool_0
+#endif
+
 #undef  TARGET_MACHINE_DEPENDENT_REORG
 #define TARGET_MACHINE_DEPENDENT_REORG	mcore_reorg
 
@@ -344,8 +348,8 @@ mcore_print_operand_address (FILE * stream, rtx x)
 	switch (GET_CODE (index))
 	  {
 	  case CONST_INT:
-	    fprintf (stream, "(%s," HOST_WIDE_INT_PRINT_DEC ")",
-		     reg_names[REGNO(base)], INTVAL (index));
+	    fprintf (stream, HOST_WIDE_INT_PRINT_DEC " (%s)",
+		     INTVAL (index), reg_names[REGNO(base)]);
 	    break;
 
 	  default:

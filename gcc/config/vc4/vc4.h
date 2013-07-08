@@ -541,6 +541,7 @@ extern const enum reg_class regno_reg_class[FIRST_PSEUDO_REGISTER];
 #define REG_OK_FOR_INDEX_P(X)	0
 
 #endif
+
 /* GO_IF_LEGITIMATE_ADDRESS recognizes an RTL expression
    that is a valid memory address for an instruction.
    The MODE argument is the machine mode for the MEM expression
@@ -561,27 +562,17 @@ extern const enum reg_class regno_reg_class[FIRST_PSEUDO_REGISTER];
    Allow  REG
 	  REG+disp 
 
-   A legitimate index for a QI is 0..15, for HI is 0..30, for SI is 0..60,
-   and for DI is 0..56 because we use two SI loads, etc.  */
-#define GO_IF_LEGITIMATE_INDEX(MODE, REGNO, OP, LABEL)			\
-  do									\
-    {									\
-      if (GET_CODE (OP) == CONST_INT) 					\
-        {								\
-	  if (GET_MODE_SIZE (MODE) >= 4					\
-	      && (((unsigned HOST_WIDE_INT) INTVAL (OP)) % 4) == 0	\
-	      &&  ((unsigned HOST_WIDE_INT) INTVAL (OP))		\
-	      <= (unsigned HOST_WIDE_INT) 64 - GET_MODE_SIZE (MODE))	\
-	    goto LABEL;							\
-	  if (GET_MODE_SIZE (MODE) == 2 				\
-	      && (((unsigned HOST_WIDE_INT) INTVAL (OP)) % 2) == 0	\
-	      &&  ((unsigned HOST_WIDE_INT) INTVAL (OP)) <= 30)		\
-	    goto LABEL;							\
-	  if (GET_MODE_SIZE (MODE) == 1 				\
-	      && ((unsigned HOST_WIDE_INT) INTVAL (OP)) <= 15)		\
-	    goto LABEL;							\
-        }								\
-    }									\
+   A legitimate index for disp is 27 bits wide (-0x4000000 to 0x3ffffff). */
+#define GO_IF_LEGITIMATE_INDEX(MODE, REGNO, OP, LABEL) \
+  do \
+    { \
+      if (GET_CODE (OP) == CONST_INT)  \
+        { \
+	  signed HOST_WIDE_INT o = INTVAL (OP); \
+	  if ((o >= -0x4000000) && (o <= 0x3ffffff)) \
+	    goto LABEL; \
+        } \
+    } \
   while (0)
 
 #define GO_IF_LEGITIMATE_ADDRESS(MODE, X, LABEL)                  \
