@@ -50,14 +50,16 @@
 (define_insn "*vc4_si_literals"
   [
     (set
-      (match_operand:SI 0 "register_operand" "=f")
-      (match_operand:SI 1 "const_int_operand" "I")
+      (match_operand:SI 0 "register_operand" "=f,r,r")
+      (match_operand:SI 1 "const_int_operand" "I,I,i")
     )
   ]
   ""
   "@
+  	mov %0, %C1
+  	mov %0, %C1
   	mov %0, %C1"
-  [(set_attr "length" "2")]
+  [(set_attr "length" "2,4,6")]
 )
 
 (define_insn "*vc4_si_moves"
@@ -74,35 +76,7 @@
   [(set_attr "length" "2,4")]
 )
 
-(define_insn "*vc4_si_loads"
-  [
-    (set
-      (match_operand:SI 0 "register_operand" "=f,r")
-      (match_operand:SI 1 "memory_operand" "m,m")
-    )
-  ]
-  ""
-  "@
-  	ld %0, %1
-  	ld %0, %1"
-  [(set_attr "length" "2,4")]
-)
-
-(define_insn "*vc4_si_stores"
-  [
-    (set
-      (match_operand:SI 0 "memory_operand" "=m,m")
-      (match_operand:SI 1 "register_operand" "f,r")
-    )
-  ]
-  ""
-  "@
-  	st %1, %0
-  	st %1, %0"
-  [(set_attr "length" "2,4")]
-)
-
-(define_insn "*vc4_si_load_indexed"
+(define_insn "*vc4_si_load_indexed_by_register"
   [
     (set
       (match_operand:SI 0 "register_operand" "=r")
@@ -120,6 +94,76 @@
   ""
   "ld %0, (%2, %1)"
   [(set_attr "length" "4")]
+)
+
+(define_insn "*vc4_si_load_indexed_by_constant"
+  [
+    (set
+      (match_operand:SI 0 "register_operand" "=f,r")
+      (mem:SI
+	(plus:SI
+	  (match_operand:SI 2 "register_operand" "f,r")
+	  (match_operand:SI 1 "const_int_operand" "I,i")
+	)
+      )
+    )
+  ]
+  ""
+  "@
+  	ld %0, %1 (%2)
+  	ld %0, %1 (%2)"
+  [(set_attr "length" "2,4")]
+)
+
+(define_insn "*vc4_si_loads"
+  [
+    (set
+      (match_operand:SI 0 "register_operand" "=f,r")
+      (mem:SI
+	(match_operand:SI 1 "register_operand" "f,r")
+      )
+    )
+  ]
+  ""
+  "@
+  	ld %0, (%1)
+  	ld %0, (%1)"
+  [(set_attr "length" "2,4")]
+)
+
+(define_insn "*vc4_si_stores_indexed_by_constant"
+  [
+    (set
+      (mem:SI
+	(plus:SI
+	  (match_operand:SI 2 "register_operand" "f,r")
+	  (match_operand:SI 1 "const_int_operand" "I,i")
+	)
+      )
+      (match_operand:SI 0 "register_operand" "f,r")
+    )
+  ]
+  ""
+  "@
+  	st %0, %1 (%2)
+  	st %0, %1 (%2)"
+  [(set_attr "length" "2,4")]
+)
+
+(define_insn "*vc4_si_stores"
+  [
+    (set
+      (mem:SI
+	(match_operand:SI 1 "register_operand" "f,r")
+      )
+      (match_operand:SI 0 "register_operand" "f,r")
+    )
+  ]
+  ""
+  "@
+  	st %1, (%0)
+  	st %1, (%0)"
+  [(set_attr "length" "2,4")]
 )
 
 ;; --- QI moves -------------------------------------------------------------
@@ -166,13 +210,15 @@
   [
     (set
       (match_operand:QI 0 "register_operand" "=f,r")
-      (match_operand:QI 1 "memory_operand" "m,m")
+      (mem:QI
+	(match_operand:SI 1 "register_operand" "f,r")
+      )
     )
   ]
   ""
   "@
-  	ldb %0, %1
-  	ldb %0, %1"
+  	ldb %0, (%1)
+  	ldb %0, (%1)"
   [(set_attr "length" "2,4")]
 )
 
@@ -182,7 +228,7 @@
       (match_operand:QI 0 "register_operand" "=r")
       (mem:QI
 	(plus:SI
-	  (match_operand:SI 1 "register_operand" "%r")
+	  (match_operand:SI 1 "register_operand" "r")
 	  (match_operand:SI 2 "register_operand" "r")
 	)
       )
@@ -196,9 +242,9 @@
 ;; --- Arithmetic -----------------------------------------------------------
 
 (define_insn "addsi3"
-  [(set (match_operand:SI 0 "" "=f,f,r,r")
-	(plus:SI (match_operand:SI 1 "" "%0,0,r,r")
-		 (match_operand:SI 2 "" "f,I,r,I")))]
+  [(set (match_operand:SI 0 "register_operand" "=f,f,?r,?r")
+	(plus:SI (match_operand:SI 1 "register_operand" "%0,0,r,r")
+		 (match_operand:SI 2 "nonmemory_operand" "f,I,r,I")))]
   ""
   "@
   	add %0, %2
@@ -209,12 +255,22 @@
 )
 
 (define_insn "subsi3"
-  [(set (match_operand:SI 0 "" "=r")
-	(minus:SI (match_operand:SI 1 "" "r")
-		 (match_operand:SI 2 "" "r")))]
+  [
+    (set
+      (match_operand:SI 0 "register_operand" "=f,f,?r,?r")
+      (minus:SI
+	(match_operand:SI 1 "register_operand" "0,0,r,r")
+	(match_operand:SI 2 "nonmemory_operand" "f,I,r,I")
+      )
+    )
+  ]
   ""
-  "sub %0, %1, %2"
-  [(set_attr "length" "4")]
+  "@
+  	sub %0, %2
+  	sub %0, %C2
+  	sub %0, %1, %2
+  	sub %0, %1, %2"
+  [(set_attr "length" "2,2,4,4")]
 )
 
 (define_insn "ashlsi3"

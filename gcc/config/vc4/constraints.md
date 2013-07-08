@@ -29,7 +29,7 @@
 
 ;; Integer constraints.
 (define_constraint "I"
-  "A 5-bit unsigned integer in the range 0 to 31."
+  "A 5-bit unsigned integer in the range 0 to 31, mostly used in ALU ops."
   (and (match_code "const_int")
        (match_test "IN_RANGE (ival, 0, 31)")))
 
