@@ -51,33 +51,21 @@
   }
 )
 
-(define_insn "*vc4_si_literals"
+(define_insn "*vc4_si_simple_moves"
   [
     (set
-      (match_operand:SI 0 "register_operand" "=f,?r,?r")
-      (match_operand:SI 1 "const_int_operand" "I,I,i")
+      (match_operand:SI 0 "register_operand" "=f,f,r,r,r")
+      (match_operand:SI 1 "nonmemory_operand" "I,f,I,i,r")
     )
   ]
   ""
   "@
-  	mov %0, %C1
-  	mov %0, %C1
-  	mov %0, %C1"
-  [(set_attr "length" "2,4,6")]
-)
-
-(define_insn "*vc4_si_moves"
-  [
-    (set
-      (match_operand:SI 0 "register_operand" "=f,?r")
-      (match_operand:SI 1 "register_operand" "f,r")
-    )
-  ]
-  ""
-  "@
-  	mov %0, %1
-  	mov %0, %1"
-  [(set_attr "length" "2,4")]
+  	mov %0, #%1 ; fast
+  	mov %0, %1 ; fast
+  	mov %0, #%1 ; slow smallint
+  	mov %0, #%1 ; largeint
+  	mov %0, %1 ; slow"
+  [(set_attr "length" "2,2,4,6,4")]
 )
 
 (define_insn "*vc4_si_load_indexed_by_register"
@@ -350,7 +338,7 @@
       (match_operand:SI 0 "register_operand" "=f,f,r,r,r,r")
       (alu_fast:SI
 	(match_operand:SI 1 "register_operand" "0,0,r,0,0,r")
-	(match_operand:SI 2 "nonmemory_operand" "i,f,I,i,r,r")
+	(match_operand:SI 2 "nonmemory_operand" "I,f,I,i,r,r")
       )
     )
   ]
