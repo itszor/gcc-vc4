@@ -248,7 +248,7 @@
 
 ;; --- Arithmetic -----------------------------------------------------------
 
-;; Fast and slow ALU instructions.
+;; Fast and slow ALU instructions. (They must not overlap.)
 
 (define_code_iterator alu_fast
   [
@@ -264,16 +264,9 @@
 
 (define_code_iterator alu_slow
   [
-    plus
-    mult
-    xor
-    minus
     and
     rotate
     ior
-    lshiftrt
-    ashift
-    ashiftrt
   ]
 )
 
@@ -313,6 +306,24 @@
 
 ;; Expand all ALU instructions.
 
+(define_expand "<alu_fast:insn>"
+  [
+    (set
+      (match_operand:SI 0 "general_operand" "")
+      (alu_fast:SI
+	(match_operand:SI 1 "general_operand" "")
+	(match_operand:SI 2 "general_operand" "")
+      )
+    )
+  ]
+  ""
+  {
+    /* Ensure we don't get any mem operands. */
+    operands[1] = force_reg(SImode, operands[1]);
+    operands[2] = force_reg(SImode, operands[2]);
+  }
+)
+
 (define_expand "<alu_slow:insn>"
   [
     (set
@@ -324,71 +335,53 @@
     )
   ]
   ""
-  ""
+  {
+    /* Ensure we don't get any mem operands. */
+    operands[1] = force_reg(SImode, operands[1]);
+    operands[2] = force_reg(SImode, operands[2]);
+  }
 )
 
 ;; Actually generate the code for the ALU instructions.
 
-(define_insn "*vc4_<alu_fast:insn>_reg_reg"
+(define_insn "*vc4_<alu_fast:insn>_fast"
   [
     (set
-      (match_operand:SI 0 "fast_register" "=f")
+      (match_operand:SI 0 "register_operand" "=f,f,r,r,r,r")
       (alu_fast:SI
-	(match_operand:SI 1 "fast_register" "0")
-	(match_operand:SI 2 "fast_register" "f")
+	(match_operand:SI 1 "register_operand" "0,0,r,0,0,r")
+	(match_operand:SI 2 "nonmemory_operand" "i,f,I,i,r,r")
       )
     )
   ]
   ""
-  "<alu_fast:opcode> %0, %2 ; fast 2op"
-  [(set_attr "length" "2")]
+  "@
+  	<alu_fast:opcode> %0, #%2 ; fast smallint
+  	<alu_fast:opcode> %0, %2 ; fast reg
+  	<alu_fast:opcode> %0, %1, #%2 ; slow smallint
+  	<alu_fast:opcode> %0, #%2 ; largeint 2op
+  	<alu_fast:opcode> %0, %2 ; slow
+  	<alu_fast:opcode> %0, %1, %2"
+  [(set_attr "length" "2,2,4,6,4,4")]
 )
 
-(define_insn "*vc4_<alu_fast:insn>_int"
+(define_insn "*vc4_<alu_slow:insn>_slow"
   [
     (set
-      (match_operand:SI 0 "fast_register" "=f")
-      (alu_fast:SI
-	(match_operand:SI 1 "fast_register" "0")
-	(match_operand:SI 2 "alu_int" "i")
-      )
-    )
-  ]
-  ""
-  "<alu_fast:opcode> %0, #%2 ; fast 2op"
-  [(set_attr "length" "2")]
-)
-
-(define_insn "*vc4_<alu_slow:insn>_reg_reg"
-  [
-    (set
-      (match_operand:SI 0 "register_operand" "=r")
+      (match_operand:SI 0 "register_operand" "=r,r,r,r")
       (alu_slow:SI
-	(match_operand:SI 1 "register_operand" "r")
-	(match_operand:SI 2 "register_operand" "r")
-      )
-    )
-  ]
-  ""
-  "<alu_slow:opcode> %0, %1, %2"
-  [(set_attr "length" "4")]
-)
-
-(define_insn "*vc4_<alu_slow:insn>_reg_and_largeint"
-  [
-    (set
-      (match_operand:SI 0 "register_operand" "=r,r")
-      (alu_slow:SI
-	(match_operand:SI 1 "register_operand" "r,0")
-	(match_operand:SI 2 "const_int_operand" "I,i")
+	(match_operand:SI 1 "register_operand" "r,0,0,r")
+	(match_operand:SI 2 "nonmemory_operand" "I,i,r,r")
       )
     )
   ]
   ""
   "@
   	<alu_slow:opcode> %0, %1, #%2
-  	<alu_slow:opcode> %0, #%2 ; largeint 2op"
-  [(set_attr "length" "6,4")]
+  	<alu_slow:opcode> %0, #%2 ; largeint 2op
+  	<alu_slow:opcode> %0, %2 ; slow
+  	<alu_slow:opcode> %0, %1, %2"
+  [(set_attr "length" "4,6,4,4")]
 )
 
 ;; --- Sign extension -------------------------------------------------------
