@@ -289,13 +289,7 @@ enum reg_class
 {
   NO_REGS,
   FAST_REGS,
-  STACKABLE_REGS,
-  OFFSETABLE_REGS,
-
-  ONLYR1_REGS,
-  LRW_REGS,
   GENERAL_REGS,
-  C_REGS,
   ALL_REGS,
 
   LIM_REG_CLASSES,
@@ -308,12 +302,7 @@ enum reg_class
 { \
   "NO_REGS", \
   "FAST_REGS", \
-  "STACKABLE_REGS", \
-  "OFFSETABLE_REGS", \
-  "ONLYR1_REGS", \
-  "LRW_REGS", \
   "GENERAL_REGS", \
-  "C_REGS", \
   "ALL_REGS", \
 }
 
@@ -326,13 +315,8 @@ enum reg_class
 { \
   {0x00000000},  /* NO_REGS */ \
   {0x0000ffff},  /* FAST_REGS */ \
-  {0x01010041},  /* STACKABLE_REGS */ \
-  {0x03000001},  /* OFFSETABLE_REGS */ \
-  {0x000002},  /* ONLYR1_REGS */ \
-  {0x007FFE},  /* LRW_REGS      */	\
-  {0x00ffffff},  /* GENERAL_REGS  */	\
-  {0x020000},  /* C_REGS        */	\
-  {0x3fffffff}   /* ALL_REGS      */	\
+  {0x00ffffff},  /* GENERAL_REGS */ \
+  {0x3fffffff}   /* ALL_REGS */ \
 }
 
 /* The same information, inverted:
@@ -370,18 +354,6 @@ extern const enum reg_class regno_reg_class[FIRST_PSEUDO_REGISTER];
   insn_const_int_ok_for_constraint (VALUE, CONSTRAINT_O)
 #define CONST_OK_FOR_P(VALUE) \
   insn_const_int_ok_for_constraint (VALUE, CONSTRAINT_P)
-
-/* Given an rtx X being reloaded into a reg required to be
-   in class CLASS, return the class of reg to actually use.
-   In general this is just CLASS; but on some machines
-   in some cases it is preferable to use a more restrictive class.  */
-#define PREFERRED_RELOAD_CLASS(X, CLASS) mcore_reload_class (X, CLASS)
-
-/* Return the register class of a scratch register needed to copy IN into
-   or out of a register in CLASS in MODE.  If it can be done directly,
-   NO_REGS is returned.  */
-#define SECONDARY_RELOAD_CLASS(CLASS, MODE, X) \
-  mcore_secondary_reload_class (CLASS, MODE, X)
 
 /* Return the maximum number of consecutive registers
    needed to represent mode MODE in a register of class CLASS. 

@@ -21,12 +21,6 @@
 (define_register_constraint "f" "FAST_REGS"
   "@internal")
 
-(define_register_constraint "b" "STACKABLE_REGS"
-  "@internal")
-
-(define_register_constraint "c" "OFFSETABLE_REGS"
-  "@internal")
-
 ;; Integer constraints.
 (define_constraint "I"
   "A 5-bit unsigned integer in the range 0 to 31, mostly used in ALU ops."

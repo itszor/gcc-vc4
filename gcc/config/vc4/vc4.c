@@ -53,11 +53,14 @@ long   mcore_current_compilation_timestamp = 0;
    reg number.  */
 const enum reg_class regno_reg_class[FIRST_PSEUDO_REGISTER] =
 {
-  GENERAL_REGS,	ONLYR1_REGS,  LRW_REGS,	    LRW_REGS,
-  LRW_REGS,	LRW_REGS,     LRW_REGS,	    LRW_REGS,
-  LRW_REGS,	LRW_REGS,     LRW_REGS,	    LRW_REGS,
-  LRW_REGS,	LRW_REGS,     LRW_REGS,	    GENERAL_REGS,
-  GENERAL_REGS, C_REGS,       NO_REGS,      NO_REGS,
+  FAST_REGS,    FAST_REGS,    FAST_REGS,    FAST_REGS,    /* 00-03 */
+  FAST_REGS,    FAST_REGS,    FAST_REGS,    FAST_REGS,    /* 04-07 */
+  FAST_REGS,    FAST_REGS,    FAST_REGS,    FAST_REGS,    /* 08-11 */
+  FAST_REGS,    FAST_REGS,    FAST_REGS,    FAST_REGS,    /* 12-15 */
+  GENERAL_REGS, GENERAL_REGS, GENERAL_REGS, GENERAL_REGS, /* 16-19 */
+  GENERAL_REGS, GENERAL_REGS, GENERAL_REGS, GENERAL_REGS, /* 20-23 */
+  GENERAL_REGS, GENERAL_REGS, GENERAL_REGS,               /* gp, sp, lr */
+  ALL_REGS,     ALL_REGS,     ALL_REGS                    /* ?ap, ?fp, ?cc */
 };
 
 struct mcore_frame
@@ -241,13 +244,11 @@ static const struct attribute_spec mcore_attribute_table[] =
 #undef TARGET_LRA_P
 #define TARGET_LRA_P hook_bool_void_true
 
-#if 0
 #undef TARGET_REGISTER_MOVE_COST
 #define TARGET_REGISTER_MOVE_COST       vc4_target_register_move_cost
 
 #undef TARGET_MEMORY_MOVE_COST
 #define TARGET_MEMORY_MOVE_COST         vc4_target_memory_move_cost
-#endif
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 
@@ -2420,6 +2421,7 @@ mcore_r15_operand_p (rtx x)
     }
 }
 
+#if 0
 /* Implement SECONDARY_RELOAD_CLASS.  If RCLASS contains r15, and we can't
    directly move X into it, use r1-r14 as a temporary.  */
 
@@ -2432,11 +2434,13 @@ mcore_secondary_reload_class (enum reg_class rclass,
     return LRW_REGS;
   return NO_REGS;
 }
+#endif
 
 /* Return the reg_class to use when reloading the rtx X into the class
    RCLASS.  If X is too complex to move directly into r15, prefer to
    use LRW_REGS instead.  */
 
+#if 0
 enum reg_class
 mcore_reload_class (rtx x, enum reg_class rclass)
 {
@@ -2445,6 +2449,7 @@ mcore_reload_class (rtx x, enum reg_class rclass)
 
   return rclass;
 }
+#endif
 
 /* Tell me if a pair of reg/subreg rtx's actually refer to the same
    register.  Note that the current version doesn't worry about whether

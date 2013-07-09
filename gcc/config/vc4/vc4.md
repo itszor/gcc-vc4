@@ -50,7 +50,7 @@
 (define_insn "*vc4_si_literals"
   [
     (set
-      (match_operand:SI 0 "register_operand" "=f,r,r")
+      (match_operand:SI 0 "register_operand" "=f,?r,?r")
       (match_operand:SI 1 "const_int_operand" "I,I,i")
     )
   ]
@@ -65,7 +65,7 @@
 (define_insn "*vc4_si_moves"
   [
     (set
-      (match_operand:SI 0 "register_operand" "=f,r")
+      (match_operand:SI 0 "register_operand" "=f,?r")
       (match_operand:SI 1 "register_operand" "f,r")
     )
   ]
@@ -241,74 +241,147 @@
 
 ;; --- Arithmetic -----------------------------------------------------------
 
-(define_insn "addsi3"
-  [(set (match_operand:SI 0 "register_operand" "=f,f,?r,?r")
-	(plus:SI (match_operand:SI 1 "register_operand" "%0,0,r,r")
-		 (match_operand:SI 2 "nonmemory_operand" "f,I,r,I")))]
-  ""
-  "@
-  	add %0, %2
-  	add %0, %C2
-  	add %0, %1, %2
-  	add %0, %1, %C2"
-  [(set_attr "length" "2,2,4,4")]
+;; Fast and slow ALU instructions.
+
+(define_code_iterator alu_fast
+  [
+    plus
+    mult
+    minus
+    xor
+    lshiftrt
+    ashift
+    ashiftrt
+  ]
 )
 
-(define_insn "subsi3"
+(define_code_iterator alu_slow
+  [
+    plus
+    mult
+    xor
+    minus
+    and
+    rotate
+    ior
+    lshiftrt
+    ashift
+    ashiftrt
+  ]
+)
+
+;; Mappings from insn names to the RTL node that actually does it.
+
+(define_code_attr insn
+  [
+    (plus "addsi3")
+    (mult "mulsi3")
+    (xor "xorsi3")
+    (minus "subsi3")
+    (and "andsi3")
+    (rotate "rotrsi3")
+    (ior "iorsi3")
+    (lshiftrt "lshrsi3")
+    (ashift "ashlsi3")
+    (ashiftrt "ashrsi3")
+  ]
+)
+
+;; Mappings from insn names to the VC4 opcode that implements it.
+
+(define_code_attr opcode
+  [
+    (plus "add")
+    (mult "mul")
+    (xor "xor")
+    (minus "sub")
+    (and "and")
+    (rotate "ror")
+    (ior "xor")
+    (lshiftrt "lsr")
+    (ashift "lsl")
+    (ashiftrt "asr")
+  ]
+)
+
+;; Expand all ALU instructions.
+
+(define_expand "<alu_slow:insn>"
   [
     (set
-      (match_operand:SI 0 "register_operand" "=f,f,?r,?r")
-      (minus:SI
-	(match_operand:SI 1 "register_operand" "0,0,r,r")
-	(match_operand:SI 2 "nonmemory_operand" "f,I,r,I")
+      (match_operand:SI 0 "general_operand" "")
+      (alu_slow:SI
+	(match_operand:SI 1 "general_operand" "")
+	(match_operand:SI 2 "general_operand" "")
+      )
+    )
+  ]
+  ""
+  ""
+)
+
+;; Actually generate the code for the ALU instructions.
+
+(define_insn "*vc4_<alu_fast:insn>_reg_reg"
+  [
+    (set
+      (match_operand:SI 0 "fast_register" "=f")
+      (alu_fast:SI
+	(match_operand:SI 1 "fast_register" "0")
+	(match_operand:SI 2 "fast_register" "f")
+      )
+    )
+  ]
+  ""
+  "<alu_fast:opcode> %0, %2 ; fast 2op"
+  [(set_attr "length" "2")]
+)
+
+(define_insn "*vc4_<alu_fast:insn>_int"
+  [
+    (set
+      (match_operand:SI 0 "fast_register" "=f")
+      (alu_fast:SI
+	(match_operand:SI 1 "fast_register" "0")
+	(match_operand:SI 2 "alu_int" "i")
+      )
+    )
+  ]
+  ""
+  "<alu_fast:opcode> %0, #%2 ; fast 2op"
+  [(set_attr "length" "2")]
+)
+
+(define_insn "*vc4_<alu_slow:insn>_reg_reg"
+  [
+    (set
+      (match_operand:SI 0 "register_operand" "=r")
+      (alu_slow:SI
+	(match_operand:SI 1 "register_operand" "r")
+	(match_operand:SI 2 "register_operand" "r")
+      )
+    )
+  ]
+  ""
+  "<alu_slow:opcode> %0, %1, %2"
+  [(set_attr "length" "4")]
+)
+
+(define_insn "*vc4_<alu_slow:insn>_reg_and_largeint"
+  [
+    (set
+      (match_operand:SI 0 "register_operand" "=r,r")
+      (alu_slow:SI
+	(match_operand:SI 1 "register_operand" "r,0")
+	(match_operand:SI 2 "const_int_operand" "I,i")
       )
     )
   ]
   ""
   "@
-  	sub %0, %2
-  	sub %0, %C2
-  	sub %0, %1, %2
-  	sub %0, %1, %2"
-  [(set_attr "length" "2,2,4,4")]
-)
-
-(define_insn "ashlsi3"
-  [
-    (set
-      (match_operand:SI 0 "" "=f,f,r,r")
-      (ashift:SI
-        (match_operand:SI 1 "" "%0,0,r,r")
-	(match_operand:SI 2 "" "f,I,r,I")
-      )
-    )
-  ]
-  ""
-  "@
-  	lsl %0, %2
-  	lsl %0, %C2
-  	lsl %0, %1, %2
-  	lsl %0, %1, %C2"
-  [(set_attr "length" "2,2,4,4")]
-)
-
-(define_insn "lshrsi3"
-  [
-    (set
-      (match_operand:SI 0 "" "=f,f,r,r")
-      (lshiftrt:SI
-        (match_operand:SI 1 "" "%0,0,r,r")
-	(match_operand:SI 2 "" "f,I,r,I")
-      )
-    )
-  ]
-  ""
-  "@
-  	lsr %0, %2
-  	lsr %0, %C2
-  	lsr %0, %1, %2
-  	lsr %0, %1, %C2"
-  [(set_attr "length" "2,2,4,4")]
+  	<alu_slow:opcode> %0, %1, #%2
+  	<alu_slow:opcode> %0, #%2 ; largeint 2op"
+  [(set_attr "length" "6,4")]
 )
 
 ;; --- Sign extension -------------------------------------------------------
@@ -316,15 +389,17 @@
 (define_insn "zero_extendqisi2"
   [
     (set
-      (match_operand:SI 0 "register_operand" "=r")
+      (match_operand:SI 0 "register_operand" "=f,r")
       (zero_extend:SI
-        (match_operand:QI 1 "general_operand" "0")
+        (match_operand:QI 1 "general_operand" "0,r")
       )
     )
   ]
   ""
-  ""
-  [(set_attr "length" "0")]
+  "@
+  	extu %0, #8
+  	extu %0, %1, #8"
+  [(set_attr "length" "2,4")]
 )
 
 (define_insn "extendqisi2"
