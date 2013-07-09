@@ -44,7 +44,11 @@
     )
   ]
   ""
-  ""
+  {
+    /* Ensure that mem->mem moves are split via a temporary register. */
+    if (GET_CODE(operands[0]) == MEM)
+      operands[1] = force_reg(SImode, operands[1]);
+  }
 )
 
 (define_insn "*vc4_si_literals"
@@ -161,8 +165,8 @@
   ]
   ""
   "@
-  	st %1, (%0)
-  	st %1, (%0)"
+  	st %0, (%1)
+  	st %0, (%1)"
   [(set_attr "length" "2,4")]
 )
 
@@ -176,7 +180,10 @@
     )
   ]
   ""
-  ""
+  {
+    if (GET_CODE(operands[0]) == MEM)
+      operands[1] = force_reg(SImode, operands[1]);
+  }
 )
 
 (define_insn "*vc4_qi_literals"
