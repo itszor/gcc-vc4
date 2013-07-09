@@ -146,6 +146,7 @@ static bool       mcore_legitimate_constant_p   (enum machine_mode, rtx);
 
 static int        vc4_target_register_move_cost(enum machine_mode mode, reg_class_t from, reg_class_t to);
 static int        vc4_target_memory_move_cost(enum machine_mode mode, reg_class_t rclass, bool in);
+static int        vc4_target_address_cost(rtx address, enum machine_mode mode, addr_space_t as, bool speed);
 
 /* MCore specific attributes.  */
 
@@ -197,8 +198,6 @@ static const struct attribute_spec mcore_attribute_table[] =
 #if 0
 #undef  TARGET_RTX_COSTS
 #define TARGET_RTX_COSTS 		mcore_rtx_costs
-#undef  TARGET_ADDRESS_COST
-#define TARGET_ADDRESS_COST 		hook_int_rtx_mode_as_bool_0
 #endif
 
 #undef  TARGET_MACHINE_DEPENDENT_REORG
@@ -250,6 +249,9 @@ static const struct attribute_spec mcore_attribute_table[] =
 #undef TARGET_MEMORY_MOVE_COST
 #define TARGET_MEMORY_MOVE_COST         vc4_target_memory_move_cost
 
+#undef  TARGET_ADDRESS_COST
+#define TARGET_ADDRESS_COST 		vc4_target_address_cost
+
 struct gcc_target targetm = TARGET_INITIALIZER;
 
 
@@ -264,13 +266,20 @@ vc4_target_register_move_cost(enum machine_mode mode, reg_class_t from, reg_clas
 }
 
 /* Compute extra cost (over TARGET_REGISTER_MOVE_COST) to do memory
- * indirections. All memory operations cost 4, so we need an extra 2 for
- * fast registers. */
+ * indirections. Slow registers are slow. */
 static int
 vc4_target_memory_move_cost(enum machine_mode mode, reg_class_t rclass, bool in)
 {
   if (rclass == FAST_REGS)
-    return 2;
+    return 0;
+  return 2;
+}
+
+/* Compute extra cost (over TARGET_REGISTER_MOVE_COST) for an addressing
+ * mode. On the VC4, all addressing modes cost the same. */
+static int
+vc4_target_address_cost(rtx address, enum machine_mode mode, addr_space_t as, bool speed)
+{
   return 0;
 }
 
