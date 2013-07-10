@@ -1,4 +1,5 @@
-/* Output routines for Motorola MCore processor
+/* vim: set ts=8 sw=2:
+   Output routines for Broadcom VideoCore IV processor
    Copyright (C) 1993-2013 Free Software Foundation, Inc.
 
    This file is part of GCC.
@@ -123,8 +124,6 @@ static const char *mcore_strip_name_encoding	(const char *);
 static int        mcore_const_costs            	(rtx, RTX_CODE);
 static int        mcore_and_cost               	(rtx);
 static int        mcore_ior_cost               	(rtx);
-static bool       mcore_rtx_costs		(rtx, int, int, int,
-						 int *, bool);
 static void       mcore_external_libcall	(rtx);
 static bool       mcore_return_in_memory	(const_tree, const_tree);
 static int        vc4_arg_partial_bytes         (cumulative_args_t,
@@ -147,6 +146,7 @@ static bool       mcore_legitimate_constant_p   (enum machine_mode, rtx);
 static int        vc4_target_register_move_cost(enum machine_mode mode, reg_class_t from, reg_class_t to);
 static int        vc4_target_memory_move_cost(enum machine_mode mode, reg_class_t rclass, bool in);
 static int        vc4_target_address_cost(rtx address, enum machine_mode mode, addr_space_t as, bool speed);
+static bool       vc4_target_rtx_costs(rtx, int, int, int, int *, bool);
 
 /* MCore specific attributes.  */
 
@@ -194,11 +194,6 @@ static const struct attribute_spec mcore_attribute_table[] =
 #define TARGET_ENCODE_SECTION_INFO 	mcore_encode_section_info
 #undef  TARGET_STRIP_NAME_ENCODING
 #define TARGET_STRIP_NAME_ENCODING	mcore_strip_name_encoding
-
-#if 0
-#undef  TARGET_RTX_COSTS
-#define TARGET_RTX_COSTS 		mcore_rtx_costs
-#endif
 
 #undef  TARGET_MACHINE_DEPENDENT_REORG
 #define TARGET_MACHINE_DEPENDENT_REORG	mcore_reorg
@@ -252,6 +247,9 @@ static const struct attribute_spec mcore_attribute_table[] =
 #undef  TARGET_ADDRESS_COST
 #define TARGET_ADDRESS_COST 		vc4_target_address_cost
 
+#undef TARGET_RTX_COSTS
+#define TARGET_RTX_COSTS                vc4_target_rtx_costs
+
 struct gcc_target targetm = TARGET_INITIALIZER;
 
 
@@ -260,7 +258,7 @@ struct gcc_target targetm = TARGET_INITIALIZER;
 static int
 vc4_target_register_move_cost(enum machine_mode mode, reg_class_t from, reg_class_t to)
 {
-  if ((from == FAST_REGS) && (to == FAST_REGS))
+  if ((from == FAST_REGS) && (to == from))
     return 2;
   return 4;
 }
@@ -539,30 +537,55 @@ mcore_ior_cost (rtx x)
 }
 
 static bool
-mcore_rtx_costs (rtx x, int code, int outer_code, int opno ATTRIBUTE_UNUSED,
+vc4_target_rtx_costs (rtx x, int code, int outer_code, int opno ATTRIBUTE_UNUSED,
 		 int * total, bool speed ATTRIBUTE_UNUSED)
 {
+  enum machine_mode mode = GET_MODE(x);
+  bool value = false;
+
   switch (code)
+  {
+    case MEM:
     {
+      value = true;
+      if (REG_P(XEXP(x, 0)))
+        *total = COSTS_N_INSNS(2);
+      else if (GET_CODE(XEXP(x, 0)) == PLUS)
+      {
+        rtx left = XEXP(XEXP(x, 0), 0);
+	rtx right = XEXP(XEXP(x, 0), 1);
+	/* Test for ra[rb] */
+	if ((GET_CODE(left) == MULT)
+	    && REG_P(XEXP(left, 0)) && CONST_INT_P(XEXP(left, 1)) && REG_P(right)
+	    && (INTVAL(XEXP(left, 1)) == GET_MODE_SIZE(mode)))
+	  *total = COSTS_N_INSNS(2);
+	/* Test for ra[rb] where ra is a byte* */
+	else if ((mode == QImode) && REG_P(left) && REG_P(right))
+	  *total = COSTS_N_INSNS(2);
+	/* Test for ra[const] */
+	else if (REG_P(left) && CONST_INT_P(right))
+	  *total = COSTS_N_INSNS(2);
+	else
+	  value = false; /* don't know */
+      }
+      else
+        value = false;
+      break;
+    }
+
     case CONST_INT:
-      *total = mcore_const_costs (x, (enum rtx_code) outer_code);
-      return true;
     case CONST:
     case LABEL_REF:
     case SYMBOL_REF:
-      *total = 5;
-      return true;
     case CONST_DOUBLE:
-      *total = 10;
-      return true;
+      *total = 0;
+      value = true;
+      break;
 
     case AND:
-      *total = COSTS_N_INSNS (mcore_and_cost (x));
-      return true;
-
     case IOR:
-      *total = COSTS_N_INSNS (mcore_ior_cost (x));
-      return true;
+      value = 1;
+      break;
 
     case DIV:
     case UDIV:
@@ -571,11 +594,11 @@ mcore_rtx_costs (rtx x, int code, int outer_code, int opno ATTRIBUTE_UNUSED,
     case FLOAT:
     case FIX:
       *total = COSTS_N_INSNS (100);
-      return true;
-  
-    default:
-      return false;
-    }
+      value = true;
+      break;
+  }
+
+  return value;
 }
 
 /* Prepare the operands for a comparison.  Return whether the branch/setcc
