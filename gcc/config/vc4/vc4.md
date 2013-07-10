@@ -1,6 +1,7 @@
-;;  Machine description the Motorola MCore
+;;  vim: set ts=8 sw=2:
+;;  Machine description the Broadcom Videocore IV.
 ;;  Copyright (C) 1993-2013 Free Software Foundation, Inc.
-;;  Contributed by Motorola.
+;;  Contributed by David Given <dg@cowlark.com>.
 
 ;; This file is part of GCC.
 
@@ -75,7 +76,7 @@
       (mem:SI
 	(plus:SI
 	  (mult:SI
-	    (match_operand:SI 1 "register_operand" "%r")
+	    (match_operand:SI 1 "register_operand" "r")
 	    (const_int 4)
 	  )
 	  (match_operand:SI 2 "register_operand" "r")
@@ -107,7 +108,7 @@
   [(set_attr "length" "2,4")]
 )
 
-(define_insn "*vc4_si_loads"
+(define_insn "*vc4_si_load"
   [
     (set
       (match_operand:SI 0 "register_operand" "=f,r")
@@ -123,7 +124,7 @@
   [(set_attr "length" "2,4")]
 )
 
-(define_insn "*vc4_si_stores_indexed_by_constant"
+(define_insn "*vc4_si_store_indexed_by_constant"
   [
     (set
       (mem:SI
@@ -215,6 +216,25 @@
   	ldb %0, (%1)
   	ldb %0, (%1)"
   [(set_attr "length" "2,4")]
+)
+
+(define_insn "*vc4_ai_load_indexed_by_constant"
+  [
+    (set
+      (match_operand:QI 0 "register_operand" "=r,r")
+      (mem:QI
+	(plus:SI
+	  (match_operand:SI 2 "register_operand" "r,r")
+	  (match_operand:SI 1 "const_int_operand" "I,i")
+	)
+      )
+    )
+  ]
+  ""
+  "@
+  	ldb %0, %1 (%2)
+  	ldb %0, %1 (%2)"
+  [(set_attr "length" "4,4")]
 )
 
 (define_insn "*vc4_qi_load_indexed"

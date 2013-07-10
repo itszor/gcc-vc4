@@ -212,14 +212,12 @@ enum
    This is ordinarily the length in words of a value of mode MODE
    but can be less for certain modes in special long registers.
 
-   On the MCore regs are UNITS_PER_WORD bits wide; */
+   On the VC4 regs are UNITS_PER_WORD bits wide. */
 #define HARD_REGNO_NREGS(REGNO, MODE)  \
    (((GET_MODE_SIZE (MODE) + UNITS_PER_WORD - 1) / UNITS_PER_WORD))
 
-/* Value is 1 if hard register REGNO can hold a value of machine-mode MODE.
-   We may keep double values in even registers.  */
-#define HARD_REGNO_MODE_OK(REGNO, MODE)  \
-  ((TARGET_8ALIGN && GET_MODE_SIZE (MODE) > UNITS_PER_WORD) ? (((REGNO) & 1) == 0) : (REGNO < 18))
+/* Value is 1 if hard register REGNO can hold a value of machine-mode MODE. */
+#define HARD_REGNO_MODE_OK(REGNO, MODE) 1
 
 /* Value is 1 if it is a good idea to tie two pseudo registers
    when one has mode MODE1 and one has mode MODE2.
@@ -230,16 +228,16 @@ enum
 
 /* Definitions for register eliminations.
 
-   We have two registers that can be eliminated on the MCore.  First, the
+   We have two registers that can be eliminated on the VC4.  First, the
    frame pointer register can often be eliminated in favor of the stack
    pointer register.  Secondly, the argument pointer register can always be
    eliminated; it is replaced with either the stack or frame pointer.  */
 
 /* Base register for access to arguments of the function.  */
-#define ARG_POINTER_REGNUM	16
+#define ARG_POINTER_REGNUM AP_REG
 
 /* Register in which the static-chain is passed to a function.  */
-#define STATIC_CHAIN_REGNUM	1
+#define STATIC_CHAIN_REGNUM	R0_REG
 
 /* This is an array of structures.  Each structure initializes one pair
    of eliminable registers.  The "from" register number is given first,
