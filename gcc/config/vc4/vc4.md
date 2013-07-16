@@ -254,7 +254,10 @@
   [(set_attr "length" "4")]
 )
 
-;; --- Arithmetic -----------------------------------------------------------
+;; --- Generic arithmetic ---------------------------------------------------
+
+;; A number of the VC4 ALU instructions follow a common form, which means
+;; we can generate the patterns for them algorithmically.
 
 ;; Fast and slow ALU instructions. (They must not overlap.)
 
@@ -262,7 +265,6 @@
   [
     plus
     mult
-    minus
     xor
     lshiftrt
     ashift
@@ -390,6 +392,36 @@
   	<alu_slow:opcode> %0, %2 ; slow
   	<alu_slow:opcode> %0, %1, %2"
   [(set_attr "length" "4,6,4,4")]
+)
+
+;; --- Special-cased arithmetic ---------------------------------------------
+
+;; These ALU instructions are weird and so need special-cased patterns.
+
+(define_insn "subsi3"
+  [
+    (set
+      (match_operand:SI 0 "register_operand" "=f,f,f,f,r,r,r,r,r,r,r")
+      (minus:SI
+	(match_operand:SI 1 "register_operand" "0,I,0,f,r,I,0,i,0,r,r")
+	(match_operand:SI 2 "nonmemory_operand" "I,0,f,0,I,0,i,0,r,0,r")
+      )
+    )
+  ]
+  ""
+  "@
+  	sub %0, #%2 ; fast smallint
+	rsb %0, #%1 ; fast smallint
+  	sub %0, %2 ; fast reg
+	rsb %0, %1 ; fast smallint
+  	sub %0, %1, #%2 ; slow smallint
+  	rsb %0, %1, #%1 ; slow smallint
+  	sub %0, #%2 ; largeint 2op
+  	rsb %0, #%1 ; largeint 2op
+  	sub %0, %2 ; slow
+  	rsb %0, %1 ; slow
+  	sub %0, %1, %2"
+  [(set_attr "length" "2,2,2,2,4,4,6,6,4,4,4")]
 )
 
 ;; --- Sign extension -------------------------------------------------------

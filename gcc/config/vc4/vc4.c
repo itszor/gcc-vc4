@@ -235,8 +235,10 @@ static const struct attribute_spec mcore_attribute_table[] =
 #undef TARGET_WARN_FUNC_RETURN
 #define TARGET_WARN_FUNC_RETURN mcore_warn_func_return
 
+#if 0
 #undef TARGET_LRA_P
 #define TARGET_LRA_P hook_bool_void_true
+#endif
 
 #undef TARGET_REGISTER_MOVE_COST
 #define TARGET_REGISTER_MOVE_COST       vc4_target_register_move_cost
@@ -278,6 +280,7 @@ vc4_target_memory_move_cost(enum machine_mode mode, reg_class_t rclass, bool in)
 static int
 vc4_target_address_cost(rtx address, enum machine_mode mode, addr_space_t as, bool speed)
 {
+  gcc_assert(0);
   return 0;
 }
 
