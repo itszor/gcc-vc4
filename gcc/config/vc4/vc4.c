@@ -64,6 +64,30 @@ const enum reg_class regno_reg_class[FIRST_PSEUDO_REGISTER] =
   ALL_REGS,     ALL_REGS,     ALL_REGS                    /* ?ap, ?fp, ?cc */
 };
 
+/* Per-function machine data.  */
+struct GTY(()) machine_function
+ {
+   /* Number of bytes saved on the stack for callee saved registers.  */
+   int callee_saved_reg_count;
+
+   /* Number of bytes saved on the stack for local variables.  */
+   int local_vars_size;
+
+   /* The sum of 2 sizes: locals vars and padding byte for saving the
+    * registers.  Used in expand_prologue () and expand_epilogue().  */
+   int size_for_adjusting_sp;
+ };
+
+
+/* Zero initialization is OK for all current fields.  */
+
+static struct machine_function *
+vc4_init_machine_status (void)
+{
+  return ggc_alloc_cleared_machine_function ();
+}
+
+
 struct mcore_frame
 {
   int arg_size;			/* Stdarg spills (bytes).  */
@@ -94,11 +118,9 @@ typedef enum
 }
 cond_type;
 
-static void       output_stack_adjust           (int, int);
-static int        calc_live_regs                (int *);
+static void       vc4_compute_frame             (void);
 static int        try_constant_tricks           (long, HOST_WIDE_INT *, HOST_WIDE_INT *);
 static const char *     output_inline_const     (enum machine_mode, rtx *);
-static void       layout_mcore_frame            (struct mcore_frame *);
 static void       vc4_setup_incoming_varargs    (cumulative_args_t, enum machine_mode, tree, int *, int);
 static cond_type  is_cond_candidate             (rtx);
 static rtx        emit_new_cond_insn            (rtx, int);
@@ -121,7 +143,6 @@ static bool       mcore_print_operand_punct_valid_p (unsigned char code);
 static void       mcore_unique_section	        (tree, int);
 static void mcore_encode_section_info		(tree, rtx, int);
 static const char *mcore_strip_name_encoding	(const char *);
-static int        mcore_const_costs            	(rtx, RTX_CODE);
 static int        mcore_and_cost               	(rtx);
 static int        mcore_ior_cost               	(rtx);
 static void       mcore_external_libcall	(rtx);
@@ -140,7 +161,7 @@ static unsigned int vc4_function_arg_boundary   (enum machine_mode,
 static void       mcore_asm_trampoline_template (FILE *);
 static void       mcore_trampoline_init		(rtx, tree, rtx);
 static bool       mcore_warn_func_return        (tree);
-static void       mcore_option_override		(void);
+static void       vc4_option_override		(void);
 static bool       mcore_legitimate_constant_p   (enum machine_mode, rtx);
 
 static int        vc4_target_register_move_cost(enum machine_mode mode, reg_class_t from, reg_class_t to);
@@ -227,7 +248,7 @@ static const struct attribute_spec mcore_attribute_table[] =
 #define TARGET_TRAMPOLINE_INIT		mcore_trampoline_init
 
 #undef TARGET_OPTION_OVERRIDE
-#define TARGET_OPTION_OVERRIDE mcore_option_override
+#define TARGET_OPTION_OVERRIDE          vc4_option_override
 
 #undef TARGET_LEGITIMATE_CONSTANT_P
 #define TARGET_LEGITIMATE_CONSTANT_P mcore_legitimate_constant_p
@@ -282,54 +303,6 @@ vc4_target_address_cost(rtx address, enum machine_mode mode, addr_space_t as, bo
 {
   gcc_assert(0);
   return 0;
-}
-
-/* Adjust the stack and return the number of bytes taken to do it.  */
-static void
-output_stack_adjust (int direction, int size)
-{
-  if (size)
-    {
-      rtx insn;
-      rtx val = GEN_INT (size);
-
-      if (size > 32)
-	{
-	  rtx nval = gen_rtx_REG (SImode, 1);
-	  emit_insn (gen_movsi (nval, val));
-	  val = nval;
-	}
-      
-      if (direction > 0)
-	insn = gen_addsi3 (stack_pointer_rtx, stack_pointer_rtx, val);
-      else
-	insn = gen_subsi3 (stack_pointer_rtx, stack_pointer_rtx, val);
-      
-      emit_insn (insn);
-    }
-}
-
-/* Work out the registers which need to be saved,
-   both as a mask and a count.  */
-
-static int
-calc_live_regs (int * count)
-{
-  int reg;
-  int live_regs_mask = 0;
-  
-  * count = 0;
-
-  for (reg = 0; reg < FIRST_PSEUDO_REGISTER; reg++)
-    {
-      if (df_regs_ever_live_p (reg) && !call_used_regs[reg])
-	{
-	  (*count)++;
-	  live_regs_mask |= (1 << reg);
-	}
-    }
-
-  return live_regs_mask;
 }
 
 /* Print the operand address in x to the stream.  */
@@ -463,80 +436,6 @@ vc4_print_operand (FILE * stream, rtx x, int code)
 	}
       break;
     }
-}
-
-/* What does a constant cost ?  */
-
-static int
-mcore_const_costs (rtx exp, enum rtx_code code)
-{
-  HOST_WIDE_INT val = INTVAL (exp);
-
-  /* Easy constants.  */
-  if (   CONST_OK_FOR_I (val)	
-      || CONST_OK_FOR_M (val)	
-      || CONST_OK_FOR_N (val)	
-      || (code == PLUS && CONST_OK_FOR_L (val)))
-    return 1;					
-  else if (code == AND
-	   && (   CONST_OK_FOR_M (~val)
-	       || CONST_OK_FOR_N (~val)))
-    return 2;
-  else if (code == PLUS			
-	   && (   CONST_OK_FOR_I (-val)	
-	       || CONST_OK_FOR_M (-val)	
-	       || CONST_OK_FOR_N (-val)))	
-    return 2;						
-
-  return 5;					
-}
-
-/* What does an and instruction cost - we do this b/c immediates may 
-   have been relaxed.   We want to ensure that cse will cse relaxed immeds
-   out.  Otherwise we'll get bad code (multiple reloads of the same const).  */
-
-static int
-mcore_and_cost (rtx x)
-{
-  HOST_WIDE_INT val;
-
-  if (GET_CODE (XEXP (x, 1)) != CONST_INT)
-    return 2;
-
-  val = INTVAL (XEXP (x, 1));
-   
-  /* Do it directly.  */
-  if (CONST_OK_FOR_K (val) || CONST_OK_FOR_M (~val))
-    return 2;
-  /* Takes one instruction to load.  */
-  else if (const_ok_for_mcore (val))
-    return 3;
-
-  /* Takes a lrw to load.  */
-  return 5;
-}
-
-/* What does an or cost - see and_cost().  */
-
-static int
-mcore_ior_cost (rtx x)
-{
-  HOST_WIDE_INT val;
-
-  if (GET_CODE (XEXP (x, 1)) != CONST_INT)
-    return 2;
-
-  val = INTVAL (XEXP (x, 1));
-
-  /* Do it directly with bclri.  */
-  if (CONST_OK_FOR_M (val))
-    return 2;
-  /* Takes one instruction to load.  */
-  else if (const_ok_for_mcore (val))
-    return 3;
-
-  /* Takes a lrw to load.  */
-  return 5;
 }
 
 static bool
@@ -778,7 +677,7 @@ int
 mcore_const_ok_for_inline (HOST_WIDE_INT value)
 {
   HOST_WIDE_INT x, y;
-   
+
   return try_constant_tricks (value, & x, & y) > 0;
 }
 
@@ -789,12 +688,12 @@ mcore_const_trick_uses_not (HOST_WIDE_INT value)
 {
   HOST_WIDE_INT x, y;
 
-  return try_constant_tricks (value, & x, & y) == 2; 
-}       
+  return try_constant_tricks (value, & x, & y) == 2;
+}
 
 /* Try tricks to load a constant inline and return the trick number if
    success (0 is non-inlinable).
-  
+
    0: not inlinable
    1: single instruction (do the usual thing)
    2: single insn followed by a 'not'
@@ -815,7 +714,7 @@ try_constant_tricks (HOST_WIDE_INT value, HOST_WIDE_INT * x, HOST_WIDE_INT * y)
   (void) y;
   if (const_ok_for_mcore (value))
     return 1;	/* Do the usual thing.  */
-  
+
   return 0;
 }
 
@@ -1534,245 +1433,28 @@ static int current_function_anonymous_args;
 #define	STORE_REACH (64)	/* Maximum displace of word store + 4.  */
 #define	ADDI_REACH (32)		/* Maximum addi operand.  */
 
-static void
-layout_mcore_frame (struct mcore_frame * infp)
-{
-  int n;
-  unsigned int i;
-  int nbytes;
-  int regarg;
-  int localregarg;
-  int outbounds;
-  unsigned int growths;
-  int step;
-
-  /* Might have to spill bytes to re-assemble a big argument that
-     was passed partially in registers and partially on the stack.  */
-  nbytes = crtl->args.pretend_args_size;
-  
-  /* Determine how much space for spilled anonymous args (e.g., stdarg).  */
-  if (current_function_anonymous_args)
-    nbytes += (NPARM_REGS - number_of_regs_before_varargs) * UNITS_PER_WORD;
-  
-  infp->arg_size = nbytes;
-
-  /* How much space to save non-volatile registers we stomp.  */
-  infp->reg_mask = calc_live_regs (& n);
-  infp->reg_size = n * 4;
-
-  /* And the rest of it... locals and space for overflowed outbounds.  */
-  infp->local_size = get_frame_size ();
-  infp->outbound_size = crtl->outgoing_args_size;
-
-  /* Make sure we have a whole number of words for the locals.  */
-  if (infp->local_size % STACK_BYTES)
-    infp->local_size = (infp->local_size + STACK_BYTES - 1) & ~ (STACK_BYTES -1);
-  
-  /* Only thing we know we have to pad is the outbound space, since
-     we've aligned our locals assuming that base of locals is aligned.  */
-  infp->pad_local = 0;
-  infp->pad_reg = 0;
-  infp->pad_outbound = 0;
-  if (infp->outbound_size % STACK_BYTES)
-    infp->pad_outbound = STACK_BYTES - (infp->outbound_size % STACK_BYTES);
-
-  /* Now we see how we want to stage the prologue so that it does
-     the most appropriate stack growth and register saves to either:
-     (1) run fast,
-     (2) reduce instruction space, or
-     (3) reduce stack space.  */
-  for (i = 0; i < ARRAY_SIZE (infp->growth); i++)
-    infp->growth[i] = 0;
-
-  regarg      = infp->reg_size + infp->arg_size;
-  localregarg = infp->local_size + regarg;
-  outbounds   = infp->outbound_size + infp->pad_outbound;
-  growths     = 0;
-
-  /* XXX: Consider one where we consider localregarg + outbound too! */
-
-  /* Frame of <= 32 bytes and using stm would get <= 2 registers.
-     use stw's with offsets and buy the frame in one shot.  */
-  if (localregarg <= ADDI_REACH
-      && (infp->reg_size <= 8 || (infp->reg_mask & 0xc000) != 0xc000))
-    {
-      /* Make sure we'll be aligned.  */
-      if (localregarg % STACK_BYTES)
-	infp->pad_reg = STACK_BYTES - (localregarg % STACK_BYTES);
-
-      step = localregarg + infp->pad_reg;
-      infp->reg_offset = infp->local_size;
-      
-      if (outbounds + step <= ADDI_REACH && !frame_pointer_needed)
-	{
-	  step += outbounds;
-	  infp->reg_offset += outbounds;
-	  outbounds = 0;
-	}
-      
-      infp->arg_offset = step - 4;
-      infp->growth[growths++] = step;
-      infp->reg_growth = growths;
-      infp->local_growth = growths;
-      
-      /* If we haven't already folded it in.  */
-      if (outbounds)
-	infp->growth[growths++] = outbounds;
-      
-      goto finish;
-    }
-
-  /* Frame can't be done with a single subi, but can be done with 2
-     insns.  If the 'stm' is getting <= 2 registers, we use stw's and
-     shift some of the stack purchase into the first subi, so both are
-     single instructions.  */
-  if (localregarg <= STORE_REACH
-      && (infp->local_size > ADDI_REACH)
-      && (infp->reg_size <= 8 || (infp->reg_mask & 0xc000) != 0xc000))
-    {
-      int all;
-
-      /* Make sure we'll be aligned; use either pad_reg or pad_local.  */
-      if (localregarg % STACK_BYTES)
-	infp->pad_reg = STACK_BYTES - (localregarg % STACK_BYTES);
-
-      all = localregarg + infp->pad_reg + infp->pad_local;
-      step = ADDI_REACH;	/* As much up front as we can.  */
-      if (step > all)
-	step = all;
-      
-      /* XXX: Consider whether step will still be aligned; we believe so.  */
-      infp->arg_offset = step - 4;
-      infp->growth[growths++] = step;
-      infp->reg_growth = growths;
-      infp->reg_offset = step - infp->pad_reg - infp->reg_size;
-      all -= step;
-
-      /* Can we fold in any space required for outbounds?  */
-      if (outbounds + all <= ADDI_REACH && !frame_pointer_needed)
-	{
-	  all += outbounds;
-	  outbounds = 0;
-	}
-
-      /* Get the rest of the locals in place.  */
-      step = all;
-      infp->growth[growths++] = step;
-      infp->local_growth = growths;
-      all -= step;
-
-      gcc_assert (all == 0);
-
-      /* Finish off if we need to do so.  */
-      if (outbounds)
-	infp->growth[growths++] = outbounds;
-      
-      goto finish;
-    }
-
-  /* Registers + args is nicely aligned, so we'll buy that in one shot.
-     Then we buy the rest of the frame in 1 or 2 steps depending on
-     whether we need a frame pointer.  */
-  if ((regarg % STACK_BYTES) == 0)
-    {
-      infp->growth[growths++] = regarg;
-      infp->reg_growth = growths;
-      infp->arg_offset = regarg - 4;
-      infp->reg_offset = 0;
-
-      if (infp->local_size % STACK_BYTES)
-	infp->pad_local = STACK_BYTES - (infp->local_size % STACK_BYTES);
-      
-      step = infp->local_size + infp->pad_local;
-      
-      if (!frame_pointer_needed)
-	{
-	  step += outbounds;
-	  outbounds = 0;
-	}
-      
-      infp->growth[growths++] = step;
-      infp->local_growth = growths;
-
-      /* If there's any left to be done.  */
-      if (outbounds)
-	infp->growth[growths++] = outbounds;
-      
-      goto finish;
-    }
-
-  /* XXX: optimizations that we'll want to play with....
-     -- regarg is not aligned, but it's a small number of registers;
-    	use some of localsize so that regarg is aligned and then 
-    	save the registers.  */
-
-  /* Simple encoding; plods down the stack buying the pieces as it goes.
-     -- does not optimize space consumption.
-     -- does not attempt to optimize instruction counts.
-     -- but it is safe for all alignments.  */
-  if (regarg % STACK_BYTES != 0)
-    infp->pad_reg = STACK_BYTES - (regarg % STACK_BYTES);
-  
-  infp->growth[growths++] = infp->arg_size + infp->reg_size + infp->pad_reg;
-  infp->reg_growth = growths;
-  infp->arg_offset = infp->growth[0] - 4;
-  infp->reg_offset = 0;
-  
-  if (frame_pointer_needed)
-    {
-      if (infp->local_size % STACK_BYTES != 0)
-	infp->pad_local = STACK_BYTES - (infp->local_size % STACK_BYTES);
-      
-      infp->growth[growths++] = infp->local_size + infp->pad_local;
-      infp->local_growth = growths;
-      
-      infp->growth[growths++] = outbounds;
-    }
-  else
-    {
-      if ((infp->local_size + outbounds) % STACK_BYTES != 0)
-	infp->pad_local = STACK_BYTES - ((infp->local_size + outbounds) % STACK_BYTES);
-      
-      infp->growth[growths++] = infp->local_size + infp->pad_local + outbounds;
-      infp->local_growth = growths;
-    }
-
-  /* Anything else that we've forgotten?, plus a few consistency checks.  */
- finish:
-  gcc_assert (infp->reg_offset >= 0);
-  gcc_assert (growths <= MAX_STACK_GROWS);
-  
-  for (i = 0; i < growths; i++)
-    gcc_assert (!(infp->growth[i] % STACK_BYTES));
-}
-
-/* Define the offset between two registers, one to be eliminated, and
-   the other its replacement, at the start of a routine.  */
+/* Implements the macro INITIAL_ELIMINATION_OFFSET, return the OFFSET.  */
 
 int
-mcore_initial_elimination_offset (int from, int to)
+vc4_initial_elimination_offset (int from, int to)
 {
-  int above_frame;
-  int below_frame;
-  struct mcore_frame fi;
+  int ret;
 
-  layout_mcore_frame (& fi);
+  /* Compute this since we need to use cfun->machine->local_vars_size.  */
+  vc4_compute_frame ();
 
-  /* fp to ap */
-  above_frame = fi.local_size + fi.pad_local + fi.reg_size + fi.pad_reg;
-  /* sp to fp */
-  below_frame = fi.outbound_size + fi.pad_outbound;
+  if ((from == FRAME_POINTER_REGNUM) && (to == HARD_FRAME_POINTER_REGNUM))
+      ret = -(cfun->machine->callee_saved_reg_count*4);
+  else if ((from == ARG_POINTER_REGNUM) && (to == HARD_FRAME_POINTER_REGNUM))
+    ret = 0;
+  else if ((from == ARG_POINTER_REGNUM) && (to == STACK_POINTER_REGNUM))
+    ret = -cfun->machine->size_for_adjusting_sp;
+  else if ((from == HARD_FRAME_POINTER_REGNUM) && (to == STACK_POINTER_REGNUM))
+    ret = -cfun->machine->size_for_adjusting_sp;
+  else
+    abort ();
 
-  if (from == ARG_POINTER_REGNUM && to == FRAME_POINTER_REGNUM)
-    return above_frame;
-
-  if (from == ARG_POINTER_REGNUM && to == STACK_POINTER_REGNUM)
-    return above_frame + below_frame;
-
-  if (from == FRAME_POINTER_REGNUM && to == STACK_POINTER_REGNUM)
-    return below_frame;
-
-  gcc_unreachable ();
+  return ret;
 }
 
 /* Keep track of some information about varargs for the prolog.  */
@@ -1803,185 +1485,106 @@ vc4_setup_incoming_varargs (cumulative_args_t args_so_far_v,
     number_of_regs_before_varargs = NPARM_REGS;
 }
 
-void
-mcore_expand_prolog (void)
+/* Compute the size of the local area and the size to be adjusted by the
+ * prologue and epilogue.  */
+
+static void
+vc4_compute_frame (void)
 {
-  struct mcore_frame fi;
-  int space_allocated = 0;
-  int growth = 0;
+  /* For aligning the local variables.  */
+  int stack_alignment = STACK_BOUNDARY / BITS_PER_UNIT;
+  int padding_locals;
+  int regno;
+  int savedregs;
 
-  /* Find out what we're doing.  */
-  layout_mcore_frame (&fi);
-  
-  space_allocated = fi.arg_size + fi.reg_size + fi.local_size +
-    fi.outbound_size + fi.pad_outbound + fi.pad_local + fi.pad_reg;
+  /* Padding needed for each element of the frame.  */
+  cfun->machine->local_vars_size = get_frame_size ();
 
-  if (mcore_naked_function_p ())
-    return;
-  
-  /* Handle stdarg+regsaves in one shot: can't be more than 64 bytes.  */
-  output_stack_adjust (-1, fi.growth[growth++]);	/* Grows it.  */
+  /* Align to the stack alignment.  */
+  padding_locals = cfun->machine->local_vars_size % stack_alignment;
+  if (padding_locals)
+    padding_locals = stack_alignment - padding_locals;
 
-  /* If we have a parameter passed partially in regs and partially in memory,
-     the registers will have been stored to memory already in function.c.  So
-     we only need to do something here for varargs functions.  */
-  if (fi.arg_size != 0 && crtl->args.pretend_args_size == 0)
+  cfun->machine->local_vars_size += padding_locals;
+
+  /* Save callee-saved registers.  */
+  savedregs = 0;
+  for (regno = 0; regno < FIRST_PSEUDO_REGISTER; regno++)
+    if (df_regs_ever_live_p (regno) && (! call_used_regs[regno]))
     {
-      int offset;
-      int rn = FIRST_PARM_REG + NPARM_REGS - 1;
-      int remaining = fi.arg_size;
-
-      for (offset = fi.arg_offset; remaining >= 4; offset -= 4, rn--, remaining -= 4)
-        {
-          emit_insn (gen_movsi
-                     (gen_rtx_MEM (SImode,
-				   plus_constant (Pmode, stack_pointer_rtx,
-						  offset)),
-                      gen_rtx_REG (SImode, rn)));
-        }
+      savedregs = regno - 6 + 1;
     }
 
-  /* Do we need another stack adjustment before we do the register saves?  */
-  if (growth < fi.reg_growth)
-    output_stack_adjust (-1, fi.growth[growth++]);		/* Grows it.  */
+  cfun->machine->callee_saved_reg_count = savedregs;
 
-#if 0 // FIXME
-  if (fi.reg_size != 0)
-    {
-      int i;
-      int offs = fi.reg_offset;
-      
-      for (i = 15; i >= 0; i--)
-        {
-          if (offs == 0 && i == 15 && ((fi.reg_mask & 0xc000) == 0xc000))
-	    {
-	      int first_reg = 15;
-
-	      while (fi.reg_mask & (1 << first_reg))
-	        first_reg--;
-	      first_reg++;
-
-	      emit_insn (gen_store_multiple (gen_rtx_MEM (SImode, stack_pointer_rtx),
-					     gen_rtx_REG (SImode, first_reg),
-					     GEN_INT (16 - first_reg)));
-
-	      i -= (15 - first_reg);
-	      offs += (16 - first_reg) * 4;
-	    }
-          else if (fi.reg_mask & (1 << i))
-	    {
-	      emit_insn (gen_movsi
-		         (gen_rtx_MEM (SImode,
-				       plus_constant (Pmode, stack_pointer_rtx,
-						      offs)),
-		          gen_rtx_REG (SImode, i)));
-	      offs += 4;
-	    }
-        }
-    }
-#endif
-
-  /* Figure the locals + outbounds.  */
-  if (frame_pointer_needed)
-    {
-      /* If we haven't already purchased to 'fp'.  */
-      if (growth < fi.local_growth)
-        output_stack_adjust (-1, fi.growth[growth++]);		/* Grows it.  */
-      
-      emit_insn (gen_movsi (frame_pointer_rtx, stack_pointer_rtx));
-
-      /* ... and then go any remaining distance for outbounds, etc.  */
-      if (fi.growth[growth])
-        output_stack_adjust (-1, fi.growth[growth++]);
-    }
-  else
-    {
-      if (growth < fi.local_growth)
-        output_stack_adjust (-1, fi.growth[growth++]);		/* Grows it.  */
-      if (fi.growth[growth])
-        output_stack_adjust (-1, fi.growth[growth++]);
-    }
+  cfun->machine->size_for_adjusting_sp =
+    crtl->args.pretend_args_size
+    + cfun->machine->local_vars_size
+    + (ACCUMULATE_OUTGOING_ARGS ? crtl->outgoing_args_size : 0);
 }
 
 void
-mcore_expand_epilog (void)
+vc4_expand_prolog (void)
 {
-  struct mcore_frame fi;
   int i;
-  int offs;
-  int growth = MAX_STACK_GROWS - 1 ;
+  rtx insn;
+  rtx operands[2];
 
-    
-  /* Find out what we're doing.  */
-  layout_mcore_frame(&fi);
+  vc4_compute_frame ();
 
-  if (mcore_naked_function_p ())
-    return;
+  if (flag_stack_usage_info)
+    current_function_static_stack_size = cfun->machine->size_for_adjusting_sp;
 
-  /* If we had a frame pointer, restore the sp from that.  */
-  if (frame_pointer_needed)
+  /* Save callee-saved registers. */
+  for (i=0; i<cfun->machine->callee_saved_reg_count; i++)
     {
-      emit_insn (gen_movsi (stack_pointer_rtx, frame_pointer_rtx));
-      growth = fi.local_growth - 1;
+      int regno = i+6;
+      insn = emit_insn(
+      	gen_pushsi (gen_rtx_REG (Pmode, regno)));
+      RTX_FRAME_RELATED_P (insn) = 1;
+    }
+
+  if (cfun->machine->size_for_adjusting_sp > 0)
+    {
+      int i = cfun->machine->size_for_adjusting_sp;
+      insn = emit_insn (gen_subsi3 (stack_pointer_rtx,
+				    stack_pointer_rtx,
+				    GEN_INT (i)));
+      RTX_FRAME_RELATED_P (insn) = 1;
+    }
+}
+
+void
+vc4_expand_epilog (void)
+{
+  int regno;
+  rtx insn;
+
+  if (cfun->machine->size_for_adjusting_sp > 0)
+    {
+      int i = cfun->machine->size_for_adjusting_sp;
+      insn = emit_insn (gen_addsi3 (stack_pointer_rtx,
+				    stack_pointer_rtx,
+				    GEN_INT (i)));
+      RTX_FRAME_RELATED_P (insn) = 1;
+    }
+
+  if (cfun->machine->callee_saved_reg_count > 0)
+    {
+      for (regno = FIRST_PSEUDO_REGISTER; regno-- > 0; )
+	if (!fixed_regs[regno] && !call_used_regs[regno]
+	    && df_regs_ever_live_p (regno))
+	  {
+	    rtx reg = gen_rtx_REG (Pmode, regno);
+	    emit_insn (gen_popsi (reg));
+	  }
     }
   else
     {
-      /* XXX: while loop should accumulate and do a single sell.  */
-      while (growth >= fi.local_growth)
-        {
-          if (fi.growth[growth] != 0)
-            output_stack_adjust (1, fi.growth[growth]);
-	  growth--;
-        }
+//      emit_insn (gen_indirect_jump (gen_rtx_REG (Pmode, LR_REG)));
     }
-
-  /* Make sure we've shrunk stack back to the point where the registers
-     were laid down. This is typically 0/1 iterations.  Then pull the
-     register save information back off the stack.  */
-  while (growth >= fi.reg_growth)
-    output_stack_adjust ( 1, fi.growth[growth--]);
-  
-  offs = fi.reg_offset;
-
-#if 0
-  for (i = 15; i >= 0; i--)
-    {
-      if (offs == 0 && i == 15 && ((fi.reg_mask & 0xc000) == 0xc000))
-	{
-	  int first_reg;
-
-	  /* Find the starting register.  */
-	  first_reg = 15;
-	  
-	  while (fi.reg_mask & (1 << first_reg))
-	    first_reg--;
-	  
-	  first_reg++;
-
-	  emit_insn (gen_load_multiple (gen_rtx_REG (SImode, first_reg),
-					gen_rtx_MEM (SImode, stack_pointer_rtx),
-					GEN_INT (16 - first_reg)));
-
-	  i -= (15 - first_reg);
-	  offs += (16 - first_reg) * 4;
-	}
-      else if (fi.reg_mask & (1 << i))
-	{
-	  emit_insn (gen_movsi
-		     (gen_rtx_REG (SImode, i),
-		      gen_rtx_MEM (SImode,
-				   plus_constant (Pmode, stack_pointer_rtx,
-						  offs))));
-	  offs += 4;
-	}
-    }
-#endif
-
-  /* Give back anything else.  */
-  /* XXX: Should accumulate total and then give it back.  */
-  while (growth >= 0)
-    output_stack_adjust ( 1, fi.growth[growth--]);
 }
+
 
 /* This code is borrowed from the SH port.  */
 
@@ -2509,8 +2112,10 @@ mcore_is_same_reg (rtx x, rtx y)
 }
 
 static void
-mcore_option_override (void)
+vc4_option_override (void)
 {
+  /* Set the per-function-data initializer.  */
+  init_machine_status = vc4_init_machine_status;
 }
 
 
@@ -3006,3 +2611,6 @@ mcore_legitimate_constant_p (enum machine_mode mode ATTRIBUTE_UNUSED, rtx x)
 {
   return GET_CODE (x) != CONST_DOUBLE;
 }
+
+#include "gt-vc4.h"
+

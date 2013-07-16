@@ -19,12 +19,12 @@
    <http://www.gnu.org/licenses/>.  */
 
 extern const char * mcore_output_jump_label_table	(void);
-extern void         mcore_expand_prolog          	(void);
-extern void         mcore_expand_epilog          	(void);
+extern void         vc4_expand_prolog               	(void);
+extern void         vc4_expand_epilog          	        (void);
 extern int          mcore_const_ok_for_inline    	(HOST_WIDE_INT);
 extern int          mcore_num_ones               	(HOST_WIDE_INT);
 extern int          mcore_num_zeros              	(HOST_WIDE_INT);
-extern int          mcore_initial_elimination_offset	(int, int);
+extern int          vc4_initial_elimination_offset	(int, int);
 extern int          mcore_byte_offset            	(unsigned int);
 extern int          mcore_halfword_offset        	(unsigned int);
 extern int          mcore_const_trick_uses_not   	(HOST_WIDE_INT);
