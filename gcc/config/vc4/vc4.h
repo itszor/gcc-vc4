@@ -280,9 +280,6 @@ enum
  *  - offsetable registers, r0, gp, sp; these have fast relative load/store encodings.
  */
 
-/* The MCore has only general registers. There are
-   also some special purpose registers: the T bit register, the
-   procedure Link and the Count Registers.  */
 enum reg_class
 {
   NO_REGS,
@@ -332,7 +329,7 @@ extern const enum reg_class regno_reg_class[FIRST_PSEUDO_REGISTER];
 #define TARGET_SMALL_REGISTER_CLASSES_FOR_MODE_P hook_bool_mode_true
  
 /* The class value for index registers, and the one for base regs.  */
-#define INDEX_REG_CLASS  NO_REGS
+#define INDEX_REG_CLASS  GENERAL_REGS
 #define BASE_REG_CLASS	 GENERAL_REGS
 
 /* Convenience wrappers around insn_const_int_ok_for_constraint.  */
