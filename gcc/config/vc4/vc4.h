@@ -251,7 +251,7 @@ enum
 /* Define the offset between two registers, one to be eliminated, and the other
    its replacement, at the start of a routine.  */
 #define INITIAL_ELIMINATION_OFFSET(FROM, TO, OFFSET) \
-  OFFSET = mcore_initial_elimination_offset (FROM, TO)
+  OFFSET = vc4_initial_elimination_offset (FROM, TO)
 
 /* Define the classes of registers for register constraints in the
    machine description.  Also define ranges of constants.
