@@ -282,7 +282,7 @@
 
 ;; Mappings from insn names to the RTL node that actually does it.
 
-(define_code_attr insn
+(define_code_attr alu_insn
   [
     (plus "addsi3")
     (mult "mulsi3")
@@ -299,7 +299,7 @@
 
 ;; Mappings from insn names to the VC4 opcode that implements it.
 
-(define_code_attr opcode
+(define_code_attr alu_opcode
   [
     (plus "add")
     (mult "mul")
@@ -316,7 +316,7 @@
 
 ;; Expand all ALU instructions.
 
-(define_expand "<alu_fast:insn>"
+(define_expand "<alu_fast:alu_insn>"
   [
     (set
       (match_operand:SI 0 "general_operand" "")
@@ -334,7 +334,7 @@
   }
 )
 
-(define_expand "<alu_slow:insn>"
+(define_expand "<alu_slow:alu_insn>"
   [
     (set
       (match_operand:SI 0 "general_operand" "")
@@ -354,7 +354,7 @@
 
 ;; Actually generate the code for the ALU instructions.
 
-(define_insn "*vc4_<alu_fast:insn>_fast"
+(define_insn "*vc4_<alu_fast:alu_insn>_fast"
   [
     (set
       (match_operand:SI 0 "register_operand" "=f,f,r,r,r,r")
@@ -366,16 +366,16 @@
   ]
   ""
   "@
-  	<alu_fast:opcode> %0, #%2 ; fast smallint
-  	<alu_fast:opcode> %0, %2 ; fast reg
-  	<alu_fast:opcode> %0, %1, #%2 ; slow smallint
-  	<alu_fast:opcode> %0, #%2 ; largeint 2op
-  	<alu_fast:opcode> %0, %2 ; slow
-  	<alu_fast:opcode> %0, %1, %2"
+  	<alu_fast:alu_opcode> %0, #%2 ; fast smallint
+  	<alu_fast:alu_opcode> %0, %2 ; fast reg
+  	<alu_fast:alu_opcode> %0, %1, #%2 ; slow smallint
+  	<alu_fast:alu_opcode> %0, #%2 ; largeint 2op
+  	<alu_fast:alu_opcode> %0, %2 ; slow
+  	<alu_fast:alu_opcode> %0, %1, %2"
   [(set_attr "length" "2,2,4,6,4,4")]
 )
 
-(define_insn "*vc4_<alu_slow:insn>_slow"
+(define_insn "*vc4_<alu_slow:alu_insn>_slow"
   [
     (set
       (match_operand:SI 0 "register_operand" "=r,r,r,r")
@@ -387,10 +387,10 @@
   ]
   ""
   "@
-  	<alu_slow:opcode> %0, %1, #%2
-  	<alu_slow:opcode> %0, #%2 ; largeint 2op
-  	<alu_slow:opcode> %0, %2 ; slow
-  	<alu_slow:opcode> %0, %1, %2"
+  	<alu_slow:alu_opcode> %0, %1, #%2
+  	<alu_slow:alu_opcode> %0, #%2 ; largeint 2op
+  	<alu_slow:alu_opcode> %0, %2 ; slow
+  	<alu_slow:alu_opcode> %0, %1, %2"
   [(set_attr "length" "4,6,4,4")]
 )
 
@@ -422,6 +422,151 @@
   	rsb %0, %1 ; slow
   	sub %0, %1, %2"
   [(set_attr "length" "2,2,2,2,4,4,6,6,4,4,4")]
+)
+
+;; --- Float arithmetic -----------------------------------------------------
+
+;; These are mostly simple 2op and 3op instructions and can be generated
+;; algorithmically.
+
+(define_code_iterator fpu_list_2op
+  [
+    abs
+  ]
+)
+
+(define_code_iterator fpu_list_3op
+  [
+    plus
+    minus
+    mult
+    div
+    smin
+    smax
+  ]
+)
+
+;; Mappings from insn names to the RTL node that actually does it.
+
+(define_code_attr fpu_insn
+  [
+    (plus "addsf3")
+    (mult "mulsf3")
+    (minus "subsf3")
+    (div "divsf3")
+    (smin "sminsf3")
+    (smax "smaxsf3")
+    (abs "abssf2")
+  ]
+)
+
+;; Mappings from insn names to the VC4 opcode that implements it.
+
+(define_code_attr fpu_opcode
+  [
+    (plus "fadd")
+    (mult "fmul")
+    (minus "fsub")
+    (div "fdiv")
+    (smin "fmin")
+    (smax "fmax")
+    (abs "fabs")
+  ]
+)
+
+;; Expand all FPU instructions.
+
+(define_insn "<fpu_list_3op:fpu_insn>"
+  [
+    (set
+      (match_operand:SF 0 "register_operand" "=r")
+      (fpu_list_3op:SF
+	(match_operand:SF 1 "register_operand" "r")
+	(match_operand:SF 2 "register_operand" "r")
+      )
+    )
+  ]
+  ""
+  "@
+  	<fpu_list_3op:fpu_opcode> %0, %1, %2"
+  [(set_attr "length" "4")]
+)
+
+(define_insn "<fpu_list_2op:fpu_insn>"
+  [
+    (set
+      (match_operand:SF 0 "register_operand" "=r")
+      (fpu_list_2op:SF
+	(match_operand:SF 1 "register_operand" "r")
+      )
+    )
+  ]
+  ""
+  "@
+  	<fpu_list_2op:fpu_opcode> %0, %1, %1"
+  [(set_attr "length" "4")]
+)
+
+;; Extra float operations, such as conversions.
+
+(define_insn "fix_truncsfsi2"
+  [
+    (set
+      (match_operand:SI 0 "register_operand" "=r")
+      (fix:SI
+	(match_operand:SF 1 "register_operand" "r")
+      )
+    )
+  ]
+  ""
+  "@
+  	ftrunc %0, %1, sasl #0"
+  [(set_attr "length" "4")]
+)
+
+(define_insn "fixuns_truncsfsi2"
+  [
+    (set
+      (match_operand:SI 0 "register_operand" "=r")
+      (unsigned_fix:SI
+	(match_operand:SF 1 "register_operand" "r")
+      )
+    )
+  ]
+  ""
+  "@
+  	ftrunc %0, %1, sasl #0"
+  [(set_attr "length" "4")]
+)
+
+(define_insn "floatsisf2"
+  [
+    (set
+      (match_operand:SF 0 "register_operand" "=r")
+      (float:SF
+	(match_operand:SI 1 "register_operand" "r")
+      )
+    )
+  ]
+  ""
+  "@
+  	flts %0, %1, sasr #0"
+  [(set_attr "length" "4")]
+)
+
+(define_insn "floatunssisf2"
+  [
+    (set
+      (match_operand:SF 0 "register_operand" "=r")
+      (unsigned_float:SF
+	(match_operand:SI 1 "register_operand" "r")
+      )
+    )
+  ]
+  ""
+  "@
+  	fltu %0, %1, sasr #0"
+  [(set_attr "length" "4")]
 )
 
 ;; --- Sign extension -------------------------------------------------------
