@@ -64,18 +64,27 @@ const enum reg_class regno_reg_class[FIRST_PSEUDO_REGISTER] =
   ALL_REGS,     ALL_REGS,     ALL_REGS                    /* ?ap, ?fp, ?cc */
 };
 
+/* The stack frame layout we're going to use looks like follows.
+ *
+ *  hi   incoming_params
+ *       ==================  ?ap, fp
+ *       callee_saves
+ *       ------------------  ?fp
+ *       local_vars
+ *       local_vars_padding
+ *       ------------------
+ *       outgoing_params
+ *  lo   ------------------  sp
+
 /* Per-function machine data.  */
 struct GTY(()) machine_function
  {
-   /* Number of bytes saved on the stack for callee saved registers.  */
-   int callee_saved_reg_count;
+   int callee_saves;
+   int local_vars;
+   int local_vars_padding;
 
-   /* Number of bytes saved on the stack for local variables.  */
-   int local_vars_size;
-
-   /* The sum of 2 sizes: locals vars and padding byte for saving the
-    * registers.  Used in expand_prologue () and expand_epilogue().  */
-   int size_for_adjusting_sp;
+   /* Topmost register which needs to be saved (or 0 if none). */
+   int topreg;
  };
 
 
@@ -1443,14 +1452,20 @@ vc4_initial_elimination_offset (int from, int to)
   /* Compute this since we need to use cfun->machine->local_vars_size.  */
   vc4_compute_frame ();
 
-  if ((from == FRAME_POINTER_REGNUM) && (to == HARD_FRAME_POINTER_REGNUM))
-      ret = -(cfun->machine->callee_saved_reg_count*4);
-  else if ((from == ARG_POINTER_REGNUM) && (to == HARD_FRAME_POINTER_REGNUM))
+  if (from == HARD_FRAME_POINTER_REGNUM)
+    from = ARG_POINTER_REGNUM;
+  if (to == HARD_FRAME_POINTER_REGNUM)
+    to = ARG_POINTER_REGNUM;
+
+  if (from == to)
     ret = 0;
+  else if ((from == FRAME_POINTER_REGNUM) && (to == ARG_POINTER_REGNUM))
+      ret = cfun->machine->callee_saves;
   else if ((from == ARG_POINTER_REGNUM) && (to == STACK_POINTER_REGNUM))
-    ret = -cfun->machine->size_for_adjusting_sp;
-  else if ((from == HARD_FRAME_POINTER_REGNUM) && (to == STACK_POINTER_REGNUM))
-    ret = -cfun->machine->size_for_adjusting_sp;
+    ret = -(cfun->machine->callee_saves +
+	cfun->machine->local_vars +
+	cfun->machine->local_vars_padding +
+	crtl->outgoing_args_size);
   else
     abort ();
 
@@ -1498,91 +1513,96 @@ vc4_compute_frame (void)
   int savedregs;
 
   /* Padding needed for each element of the frame.  */
-  cfun->machine->local_vars_size = get_frame_size ();
+  cfun->machine->local_vars = get_frame_size ();
 
   /* Align to the stack alignment.  */
-  padding_locals = cfun->machine->local_vars_size % stack_alignment;
+  padding_locals = cfun->machine->local_vars % stack_alignment;
   if (padding_locals)
     padding_locals = stack_alignment - padding_locals;
 
-  cfun->machine->local_vars_size += padding_locals;
+  cfun->machine->local_vars_padding = padding_locals;
 
   /* Save callee-saved registers.  */
-  savedregs = 0;
+  cfun->machine->topreg = 0;
   for (regno = 0; regno < FIRST_PSEUDO_REGISTER; regno++)
     if (df_regs_ever_live_p (regno) && (! call_used_regs[regno]))
     {
-      savedregs = regno - 6 + 1;
+      cfun->machine->topreg = regno;
     }
 
-  cfun->machine->callee_saved_reg_count = savedregs;
-
-  cfun->machine->size_for_adjusting_sp =
-    crtl->args.pretend_args_size
-    + cfun->machine->local_vars_size
-    + (ACCUMULATE_OUTGOING_ARGS ? crtl->outgoing_args_size : 0);
+  cfun->machine->callee_saves = 0;
+  if (cfun->machine->topreg > 0)
+    cfun->machine->callee_saves = (cfun->machine->topreg-5) * 4;
 }
 
 void
-vc4_expand_prolog (void)
+vc4_expand_prologue (void)
 {
-  int i;
   rtx insn;
-  rtx operands[2];
+  int sp_adjust;
+  int regno;
 
   vc4_compute_frame ();
 
+  /* Does not include callee_saves, as the push instruction adjusts sp
+   * for us. */
+  sp_adjust =
+    cfun->machine->local_vars +
+    cfun->machine->local_vars_padding +
+    crtl->outgoing_args_size;
+
   if (flag_stack_usage_info)
-    current_function_static_stack_size = cfun->machine->size_for_adjusting_sp;
+    current_function_static_stack_size = sp_adjust
+	+ cfun->machine->callee_saves;
 
   /* Save callee-saved registers. */
-  for (i=0; i<cfun->machine->callee_saved_reg_count; i++)
-    {
-      int regno = i+6;
-      insn = emit_insn(
-      	gen_pushsi (gen_rtx_REG (Pmode, regno)));
-      RTX_FRAME_RELATED_P (insn) = 1;
-    }
+  if (cfun->machine->topreg > 0)
+    for (regno=6; regno<=cfun->machine->topreg; regno++)
+      {
+	insn = emit_insn(
+	  gen_pushsi (gen_rtx_REG (Pmode, regno)));
+	RTX_FRAME_RELATED_P (insn) = 1;
+      }
 
-  if (cfun->machine->size_for_adjusting_sp > 0)
+  if (sp_adjust > 0)
     {
-      int i = cfun->machine->size_for_adjusting_sp;
       insn = emit_insn (gen_subsi3 (stack_pointer_rtx,
 				    stack_pointer_rtx,
-				    GEN_INT (i)));
+				    GEN_INT (sp_adjust)));
       RTX_FRAME_RELATED_P (insn) = 1;
     }
 }
 
 void
-vc4_expand_epilog (void)
+vc4_expand_epilogue (void)
 {
   int regno;
   rtx insn;
+  int sp_adjust;
 
-  if (cfun->machine->size_for_adjusting_sp > 0)
+  /* Does not include callee_saves, as the push instruction adjusts sp
+   * for us. */
+  sp_adjust =
+    cfun->machine->local_vars +
+    cfun->machine->local_vars_padding +
+    crtl->outgoing_args_size;
+
+  if (sp_adjust > 0)
     {
-      int i = cfun->machine->size_for_adjusting_sp;
       insn = emit_insn (gen_addsi3 (stack_pointer_rtx,
 				    stack_pointer_rtx,
-				    GEN_INT (i)));
+				    GEN_INT (sp_adjust)));
       RTX_FRAME_RELATED_P (insn) = 1;
     }
 
-  if (cfun->machine->callee_saved_reg_count > 0)
-    {
-      for (regno = FIRST_PSEUDO_REGISTER; regno-- > 0; )
-	if (!fixed_regs[regno] && !call_used_regs[regno]
-	    && df_regs_ever_live_p (regno))
-	  {
-	    rtx reg = gen_rtx_REG (Pmode, regno);
-	    emit_insn (gen_popsi (reg));
-	  }
-    }
-  else
-    {
-//      emit_insn (gen_indirect_jump (gen_rtx_REG (Pmode, LR_REG)));
-    }
+  /* Restore callee-saved registers. */
+  if (cfun->machine->topreg > 0)
+    for (regno=6; regno<=cfun->machine->topreg; regno++)
+      {
+	insn = emit_insn(
+	  gen_popsi (gen_rtx_REG (Pmode, regno)));
+	RTX_FRAME_RELATED_P (insn) = 1;
+      }
 }
 
 

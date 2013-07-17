@@ -81,7 +81,7 @@
   ]
   ""
   {
-    vc4_expand_prolog ();
+    vc4_expand_prologue ();
     DONE;
   }
 )
@@ -92,7 +92,7 @@
   ]
   ""
   {
-    vc4_expand_epilog ();
+    vc4_expand_epilogue ();
   }
 )
 
@@ -381,36 +381,30 @@
 (define_expand "<alu_fast:alu_insn>"
   [
     (set
-      (match_operand:SI 0 "general_operand" "")
+      (match_operand:SI 0 "register_operand" "")
       (alu_fast:SI
-	(match_operand:SI 1 "general_operand" "")
-	(match_operand:SI 2 "general_operand" "")
+	(match_operand:SI 1 "register_operand" "")
+	(match_operand:SI 2 "nonmemory_operand" "")
       )
     )
   ]
   ""
   {
-    /* Ensure we don't get any mem operands. */
-    operands[1] = force_reg(SImode, operands[1]);
-    operands[2] = force_reg(SImode, operands[2]);
   }
 )
 
 (define_expand "<alu_slow:alu_insn>"
   [
     (set
-      (match_operand:SI 0 "general_operand" "")
+      (match_operand:SI 0 "register_operand" "")
       (alu_slow:SI
-	(match_operand:SI 1 "general_operand" "")
-	(match_operand:SI 2 "general_operand" "")
+	(match_operand:SI 1 "register_operand" "")
+	(match_operand:SI 2 "nonmemory_operand" "")
       )
     )
   ]
   ""
   {
-    /* Ensure we don't get any mem operands. */
-    operands[1] = force_reg(SImode, operands[1]);
-    operands[2] = force_reg(SImode, operands[2]);
   }
 )
 
