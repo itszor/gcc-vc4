@@ -310,7 +310,7 @@ enum reg_class
 { \
   {0x00000000},  /* NO_REGS */ \
   {0x0000ffff},  /* FAST_REGS */ \
-  {0x00ffffff},  /* GENERAL_REGS */ \
+  {0x07ffffff},  /* GENERAL_REGS */ \
   {0x3fffffff}   /* ALL_REGS */ \
 }
 
