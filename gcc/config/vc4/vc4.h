@@ -1,22 +1,25 @@
-/* Definitions of target machine for GNU compiler,
-   for Broadcom VideoCore IV processor.
-   Copyright (C) 1993-2013 Free Software Foundation, Inc.
-
-   This file is part of GCC.
-
-   GCC is free software; you can redistribute it and/or modify it
-   under the terms of the GNU General Public License as published
-   by the Free Software Foundation; either version 3, or (at your
-   option) any later version.
-
-   GCC is distributed in the hope that it will be useful, but WITHOUT
-   ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
-   or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public
-   License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with GCC; see the file COPYING3.  If not see
-   <http://www.gnu.org/licenses/>.  */
+/* vim: set ts=4 sw=4:
+ *
+ * Definitions of target machine for GNU compiler,
+ * for Broadcom VideoCore IV processor.
+ * Copyright (C) 1993-2013 Free Software Foundation, Inc.
+ *
+ * This file is part of GCC.
+ *
+ * GCC is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License as published
+ * by the Free Software Foundation; either version 3, or (at your
+ * option) any later version.
+ *
+ * GCC is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+ * or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public
+ * License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with GCC; see the file COPYING3.  If not see
+ * <http://www.gnu.org/licenses/>.
+ */
 
 #ifndef GCC_VC4_H
 #define GCC_VC4_H
@@ -46,8 +49,8 @@
 #undef TARGET_8ALIGN
 #define TARGET_8ALIGN 1
 
-extern char * mcore_current_function_name;
- 
+extern char *mcore_current_function_name;
+
 /* Target machine storage Layout.  */
 
 #define PROMOTE_MODE(MODE,UNSIGNEDP,TYPE)  	\
@@ -119,7 +122,7 @@ extern char * mcore_current_function_name;
   (TREE_CODE (TYPE) == ARRAY_TYPE \
    && TYPE_MODE (TREE_TYPE (TYPE)) == QImode \
    && (ALIGN) < FASTEST_ALIGNMENT ? FASTEST_ALIGNMENT : (ALIGN))
-     
+
 /* Set this nonzero if move instructions will actually fail to work
    when given unaligned data.  */
 #define STRICT_ALIGNMENT 1
@@ -147,24 +150,23 @@ extern char * mcore_current_function_name;
  *
  */
 
-enum
-{
-  R0_REG,  R1_REG,  R2_REG,  R3_REG,  R4_REG,  R5_REG,  R6_REG,  R7_REG,
-  R8_REG,  R9_REG,  R10_REG, R11_REG, R12_REG, R13_REG, R14_REG, R15_REG,
-  R16_REG, R17_REG, R18_REG, R19_REG, R20_REG, R21_REG, R22_REG, R23_REG,
-  GP_REG,  SP_REG,  LR_REG,
-  AP_REG,  FP_REG,  CC_REG,
+enum {
+    R0_REG, R1_REG, R2_REG, R3_REG, R4_REG, R5_REG, R6_REG, R7_REG,
+    R8_REG, R9_REG, R10_REG, R11_REG, R12_REG, R13_REG, R14_REG, R15_REG,
+    R16_REG, R17_REG, R18_REG, R19_REG, R20_REG, R21_REG, R22_REG, R23_REG,
+    GP_REG, SP_REG, LR_REG,
+    AP_REG, FP_REG, CC_REG,
 
-  FIRST_PSEUDO_REGISTER
+    FIRST_PSEUDO_REGISTER
 };
 
 /* Specify the registers used for certain standard purposes.
    The values of these macros are register numbers.  */
 
 
-#undef PC_REGNUM /* Define this if the program counter is overloaded on a register.  */
-#define STACK_POINTER_REGNUM SP_REG /* Register to use for pushing function arguments.  */
-#define FRAME_POINTER_REGNUM R6_REG /* When we need FP, use r6.  */
+#undef PC_REGNUM                /* Define this if the program counter is overloaded on a register.  */
+#define STACK_POINTER_REGNUM SP_REG     /* Register to use for pushing function arguments.  */
+#define FRAME_POINTER_REGNUM R6_REG     /* When we need FP, use r6.  */
 
 /* The assembler's names for the registers.  RFP need not always be used as
    the Real framepointer; it can also be used as a normal general register.
@@ -280,15 +282,14 @@ enum
  *  - offsetable registers, r0, gp, sp; these have fast relative load/store encodings.
  */
 
-enum reg_class
-{
-  NO_REGS,
-  FAST_REGS,
-  GENERAL_REGS,
-  ALL_REGS,
+enum reg_class {
+    NO_REGS,
+    FAST_REGS,
+    GENERAL_REGS,
+    ALL_REGS,
 
-  LIM_REG_CLASSES,
-  N_REG_CLASSES = LIM_REG_CLASSES
+    LIM_REG_CLASSES,
+    N_REG_CLASSES = LIM_REG_CLASSES
 };
 
 
@@ -327,7 +328,7 @@ extern const enum reg_class regno_reg_class[FIRST_PSEUDO_REGISTER];
    but prevents the compiler from extending the lifetime of these
    registers.  */
 #define TARGET_SMALL_REGISTER_CLASSES_FOR_MODE_P hook_bool_mode_true
- 
+
 /* The class value for index registers, and the one for base regs.  */
 #define INDEX_REG_CLASS  GENERAL_REGS
 #define BASE_REG_CLASS	 GENERAL_REGS
@@ -367,7 +368,7 @@ extern const enum reg_class regno_reg_class[FIRST_PSEUDO_REGISTER];
 
 /* Define this if pushing a word on the stack
    makes the stack pointer a smaller address.  */
-#define STACK_GROWS_DOWNWARD  
+#define STACK_GROWS_DOWNWARD
 
 /* Offset within stack frame to start allocating local variables at.
    If FRAME_GROWS_DOWNWARD, this is the offset to the END of the
@@ -555,7 +556,7 @@ extern const enum reg_class regno_reg_class[FIRST_PSEUDO_REGISTER];
       if (BASE_REGISTER_RTX_P (xop1))				  \
 	GO_IF_LEGITIMATE_INDEX (MODE, REGNO (xop1), xop0, LABEL); \
     }								  \
-}								   
+}
 
 /* Specify the machine mode that this machine uses
    for the index in the tablejump instruction.  */
@@ -652,7 +653,7 @@ extern const enum reg_class regno_reg_class[FIRST_PSEUDO_REGISTER];
 	   reg_names[STACK_POINTER_REGNUM],		\
 	   (STACK_BOUNDARY / BITS_PER_UNIT))
 
-  
+
 /* Output a reference to a label.  */
 #undef  ASM_OUTPUT_LABELREF
 #define ASM_OUTPUT_LABELREF(STREAM, NAME)  \
@@ -738,7 +739,7 @@ extern long mcore_current_compilation_timestamp;
 
 /* This says how to output an assembler line
    to define a global common symbol, with alignment information.  */
-/* XXX - for now we ignore the alignment.  */     
+/* XXX - for now we ignore the alignment.  */
 #undef  ASM_OUTPUT_ALIGNED_COMMON
 #define ASM_OUTPUT_ALIGNED_COMMON(FILE, NAME, SIZE, ALIGN)	\
   do								\
@@ -775,4 +776,4 @@ extern long mcore_current_compilation_timestamp;
     }									\
   while (0)
 
-#endif /* ! GCC_VC4_H */
+#endif                          /* ! GCC_VC4_H */
