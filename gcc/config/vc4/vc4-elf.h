@@ -1,22 +1,25 @@
-/* Definitions of MCore target. 
-   Copyright (C) 1998-2013 Free Software Foundation, Inc.
-   Contributed by Cygnus Solutions.
-
-This file is part of GCC.
-
-GCC is free software; you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation; either version 3, or (at your option)
-any later version.
-
-GCC is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with GCC; see the file COPYING3.  If not see
-<http://www.gnu.org/licenses/>.  */
+/* vim: set ts=4 sw=4:
+ *
+ * Definitions of target machine for GNU compiler,
+ * for Broadcom VideoCore IV processor.
+ * Copyright (C) 1993-2013 Free Software Foundation, Inc.
+ *
+ * This file is part of GCC.
+ *
+ * GCC is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License as published
+ * by the Free Software Foundation; either version 3, or (at your
+ * option) any later version.
+ *
+ * GCC is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+ * or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public
+ * License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with GCC; see the file COPYING3.  If not see
+ * <http://www.gnu.org/licenses/>.
+ */
 
 #ifndef __MCORE_ELF_H__
 #define __MCORE_ELF_H__
@@ -78,7 +81,7 @@ along with GCC; see the file COPYING3.  If not see
       ASM_OUTPUT_LABEL(FILE, NAME);				\
     }								\
   while (0)
- 
+
 /* Output the size directive for a decl in rest_of_decl_compilation
    in the case where we did not do so before the initializer.
    Once we find the error_mark_node, we know that the value of
@@ -121,5 +124,5 @@ along with GCC; see the file COPYING3.  If not see
 #define CTORS_SECTION_ASM_OP	"\t.section\t.ctors,\"aw\""
 #undef  DTORS_SECTION_ASM_OP
 #define DTORS_SECTION_ASM_OP	"\t.section\t.dtors,\"aw\""
-     
-#endif /* __MCORE_ELF_H__ */
+
+#endif                          /* __MCORE_ELF_H__ */
