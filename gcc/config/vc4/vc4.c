@@ -1,5 +1,4 @@
-/*
- * vim: set ts=4 sw=4:
+/* vim: set ts=4 sw=4:
  *
  * Output routines for Broadcom VideoCore IV processor
  * Copyright (C) 1993-2013 Free Software Foundation, Inc.
@@ -172,6 +171,10 @@ static bool mcore_warn_func_return(tree);
 static void vc4_option_override(void);
 static bool mcore_legitimate_constant_p(enum machine_mode, rtx);
 
+static void vc4_target_asm_function_prologue(FILE *file, HOST_WIDE_INT size);
+
+static void vc4_target_asm_function_epilogue(FILE *file, HOST_WIDE_INT size);
+
 static int vc4_target_register_move_cost(enum machine_mode mode,
                                          reg_class_t from, reg_class_t to);
 static int vc4_target_memory_move_cost(enum machine_mode mode,
@@ -277,6 +280,12 @@ static const struct attribute_spec mcore_attribute_table[] = {
 #undef TARGET_LRA_P
 #define TARGET_LRA_P hook_bool_void_true
 #endif
+
+#undef TARGET_ASM_FUNCTION_PROLOGUE
+#define TARGET_ASM_FUNCTION_PROLOGUE    vc4_target_asm_function_prologue
+
+#undef TARGET_ASM_FUNCTION_EPILOGUE
+#define TARGET_ASM_FUNCTION_EPILOGUE    vc4_target_asm_function_epilogue
 
 #undef TARGET_REGISTER_MOVE_COST
 #define TARGET_REGISTER_MOVE_COST       vc4_target_register_move_cost
@@ -1699,77 +1708,115 @@ static void vc4_compute_frame(void)
         cfun->machine->callee_saves = (cfun->machine->topreg - 5) * 4;
 }
 
-void vc4_expand_prologue(void)
+static void vc4_target_asm_function_prologue(FILE *file, HOST_WIDE_INT size)
 {
     rtx insn;
     int sp_adjust;
     int regno;
 
     vc4_compute_frame();
+    fprintf(file, "\t; callee saves = %d bytes\n",
+		cfun->machine->callee_saves);
+    fprintf(file, "\t; local vars = %d+%d bytes\n",
+		cfun->machine->local_vars, cfun->machine->local_vars_padding);
+    fprintf(file, "\t; outgoing = %d bytes\n",
+		crtl->outgoing_args_size);
+	fprintf(file, "\t; needs frame pointer = %d\n", frame_pointer_needed);
 
     /*
      * Does not include callee_saves, as the push instruction adjusts sp
-     * for us. 
+     * for us.
      */
     sp_adjust =
         cfun->machine->local_vars +
         cfun->machine->local_vars_padding + crtl->outgoing_args_size;
 
-    if (flag_stack_usage_info)
-        current_function_static_stack_size = sp_adjust
-            + cfun->machine->callee_saves;
+    /* Save callee-saved registers. */
 
-    /*
-     * Save callee-saved registers. 
-     */
     if (cfun->machine->topreg > 0)
-        for (regno = 6; regno <= cfun->machine->topreg; regno++)
-        {
-            insn = emit_insn(gen_pushsi(gen_rtx_REG(Pmode, regno)));
-            RTX_FRAME_RELATED_P(insn) = 1;
-        }
+    {
+		rtx op = gen_rtx_REG(Pmode, cfun->machine->topreg);
+    	if (cfun->machine->topreg == 6)
+    		output_asm_insn("push %0, lr", &op);
+    	else
+    		output_asm_insn("push r6-%0, lr", &op);
+    }
+
+	/* If we need a frame pointer, set it up now. */
+
+	if (frame_pointer_needed)
+	{
+		rtx ops[] =
+		{
+			gen_rtx_REG(Pmode, FRAME_POINTER_REGNUM),
+			gen_rtx_REG(Pmode, STACK_POINTER_REGNUM)
+		};
+
+		output_asm_insn("mov %0, %1", ops);
+	}
 
     if (sp_adjust > 0)
     {
-        insn = emit_insn(gen_subsi3(stack_pointer_rtx,
-                                    stack_pointer_rtx,
-                                    GEN_INT(sp_adjust)));
-        RTX_FRAME_RELATED_P(insn) = 1;
+    	rtx ops[2] =
+    	{
+    		stack_pointer_rtx,
+    		GEN_INT(sp_adjust)
+    	};
+    	output_asm_insn("sub %0, #%1", ops);
     }
 }
 
-void vc4_expand_epilogue(void)
+static void vc4_target_asm_function_epilogue(FILE *file, HOST_WIDE_INT size)
 {
-    int regno;
     rtx insn;
-    int sp_adjust;
+    int regno;
 
-    /*
-     * Does not include callee_saves, as the push instruction adjusts sp
-     * for us. 
-     */
-    sp_adjust =
-        cfun->machine->local_vars +
-        cfun->machine->local_vars_padding + crtl->outgoing_args_size;
+    vc4_compute_frame();
 
-    if (sp_adjust > 0)
-    {
-        insn = emit_insn(gen_addsi3(stack_pointer_rtx,
-                                    stack_pointer_rtx,
-                                    GEN_INT(sp_adjust)));
-        RTX_FRAME_RELATED_P(insn) = 1;
+
+	if (frame_pointer_needed)
+	{
+		/* If we had a frame pointer, reset the stack. */
+
+		rtx ops[] =
+		{
+			gen_rtx_REG(Pmode, FRAME_POINTER_REGNUM),
+			gen_rtx_REG(Pmode, STACK_POINTER_REGNUM)
+		};
+
+		output_asm_insn("mov %1, %0", ops);
+	}
+	else
+	{
+		/* Otherwise retract over the locals. */
+
+		int sp_adjust = cfun->machine->local_vars +
+			cfun->machine->local_vars_padding + crtl->outgoing_args_size;
+
+		if (sp_adjust > 0)
+		{
+			rtx ops[2] =
+			{
+				stack_pointer_rtx,
+				GEN_INT(sp_adjust)
+			};
+			output_asm_insn("sub %0, #%1", ops);
+		}
     }
 
     /*
-     * Restore callee-saved registers. 
+     * Reload callee-saved registers and return.
      */
     if (cfun->machine->topreg > 0)
-        for (regno = 6; regno <= cfun->machine->topreg; regno++)
-        {
-            insn = emit_insn(gen_popsi(gen_rtx_REG(Pmode, regno)));
-            RTX_FRAME_RELATED_P(insn) = 1;
-        }
+    {
+		rtx op = gen_rtx_REG(Pmode, cfun->machine->topreg);
+    	if (cfun->machine->topreg == 6)
+    		output_asm_insn("pop %0, pc", &op);
+    	else
+    		output_asm_insn("pop r6-%0, pc", &op);
+    }
 }
+
 
 /*
  * This code is borrowed from the SH port.  

@@ -29,8 +29,8 @@
 (define_constants
   [
     (GP_REGNO 25)
-    (SP_REGNO 25)
-    (LR_REGNO 25)
+    (SP_REGNO 26)
+    (LR_REGNO 27)
   ]
 )
 
@@ -44,58 +44,6 @@
   "nop"
   [(set_attr "length" "2")]
 )
-
-(define_insn "pushsi"
-  [
-    (set
-      (mem:SI
-	(pre_dec:SI
-	  (reg:SI SP_REGNO)
-	)
-      )
-      (match_operand:SI 0 "register_operand" "r")
-    )
-  ]
-  ""
-  "push %0"
-)
-
-(define_insn "popsi"
-  [
-    (set
-      (match_operand:SI 0 "register_operand" "=r")
-      (mem:SI
-	(post_inc:SI
-	  (reg:SI SP_REGNO)
-	)
-      )
-    )
-  ]
-  ""
-  "pop %0"
-)
-
-(define_expand "prologue"
-  [
-    (const_int 0)
-  ]
-  ""
-  {
-    vc4_expand_prologue ();
-    DONE;
-  }
-)
-
-(define_expand "epilogue"
-  [
-    (const_int 0)
-  ]
-  ""
-  {
-    vc4_expand_epilogue ();
-  }
-)
-
 
 ;; --- SI moves -------------------------------------------------------------
 
