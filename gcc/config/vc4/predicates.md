@@ -32,15 +32,3 @@
   }
 )
 
-;; Nonzero if OP is a small immediate integer of type I.
-
-(define_predicate "alu_int"
-  (match_code "const_int")
-  {
-    if (GET_CODE(op) != CONST_INT)
-      return 0;
-
-    return CONST_OK_FOR_I(INTVAL(op));
-  }
-)
-
