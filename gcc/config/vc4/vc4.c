@@ -73,12 +73,17 @@ const enum reg_class regno_reg_class[FIRST_PSEUDO_REGISTER] =
 };
 
 /*
- * The stack frame layout we're going to use looks like follows.  hi
- * incoming_params ================== ?ap, fp callee_saves
- * ------------------ ?fp local_vars local_vars_padding ------------------ 
- * outgoing_params lo ------------------ sp
+ * The stack frame layout we're going to use looks like follows.
+ * hi   incoming_params
+ *      ================== ?ap, fp
+ *      callee_saves
+ *      ------------------ ?fp
+ *      local_vars
+ *      local_vars_padding
+ *      ------------------
+ *      outgoing_params
+ * lo   ------------------ sp
  * 
- * /* Per-function machine data.  
  */
 struct GTY (()) machine_function {
     int callee_saves;
@@ -335,7 +340,6 @@ static int
 vc4_target_address_cost(rtx address, enum machine_mode mode,
                         addr_space_t as, bool speed)
 {
-    gcc_assert(0);
     return 0;
 }
 
@@ -1617,10 +1621,10 @@ int vc4_initial_elimination_offset(int from, int to)
     else if ((from == FRAME_POINTER_REGNUM) && (to == ARG_POINTER_REGNUM))
         ret = cfun->machine->callee_saves;
     else if ((from == ARG_POINTER_REGNUM) && (to == STACK_POINTER_REGNUM))
-        ret = -(cfun->machine->callee_saves +
-                cfun->machine->local_vars +
-                cfun->machine->local_vars_padding +
-                crtl->outgoing_args_size);
+        ret = cfun->machine->callee_saves +
+              cfun->machine->local_vars +
+              cfun->machine->local_vars_padding +
+              crtl->outgoing_args_size;
     else
         abort();
 
@@ -1703,9 +1707,9 @@ static void vc4_compute_frame(void)
             cfun->machine->topreg = regno;
         }
 
-    cfun->machine->callee_saves = 0;
+    cfun->machine->callee_saves = 4;
     if (cfun->machine->topreg > 0)
-        cfun->machine->callee_saves = (cfun->machine->topreg - 5) * 4;
+        cfun->machine->callee_saves += (cfun->machine->topreg - 5) * 4;
 }
 
 static void vc4_target_asm_function_prologue(FILE *file, HOST_WIDE_INT size)
@@ -1741,6 +1745,8 @@ static void vc4_target_asm_function_prologue(FILE *file, HOST_WIDE_INT size)
     	else
     		output_asm_insn("push r6-%0, lr", &op);
     }
+    else
+    	output_asm_insn("push lr", NULL);
 
 	/* If we need a frame pointer, set it up now. */
 
@@ -1815,6 +1821,8 @@ static void vc4_target_asm_function_epilogue(FILE *file, HOST_WIDE_INT size)
     	else
     		output_asm_insn("pop r6-%0, pc", &op);
     }
+    else
+    	output_asm_insn("pop pc", NULL);
 }
 
 
