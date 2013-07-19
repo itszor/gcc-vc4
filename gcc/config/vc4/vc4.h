@@ -432,6 +432,10 @@ extern const enum reg_class regno_reg_class[FIRST_PSEUDO_REGISTER];
    && GET_MODE_UNIT_SIZE ((MODE)) > UNITS_PER_WORD) 	\
    ? ((X) + ((X) & 1)) : (X))
 
+/* We have postincrement and predecrement, and want to use them. */
+
+#define HAVE_POST_INCREMENT 1
+#define HAVE_PRE_DECREMENT 1
 
 /* Initialize a variable CUM of type CUMULATIVE_ARGS
    for a call to a function whose data type is FNTYPE.

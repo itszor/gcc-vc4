@@ -79,18 +79,36 @@
   [(set_attr "length" "2,2,4,6,4")]
 )
 
+;; --- SI loads -------------------------------------------------------------
+
+(define_insn "*vc4_si_load_post_increment"
+  [
+    (set
+      (match_operand:SI 0 "register_operand" "=r")
+      (mem:SI
+        (post_inc:SI
+          (match_operand:SI 1 "register_operand" "r")
+        )
+      )
+    )
+  ]
+  ""
+  "ld %0, (%1)++"
+  [(set_attr "length" "4")]
+)
+
 (define_insn "*vc4_si_load_indexed_by_register"
   [
     (set
       (match_operand:SI 0 "register_operand" "=r")
       (mem:SI
-	(plus:SI
-	  (mult:SI
-	    (match_operand:SI 1 "register_operand" "r")
-	    (const_int 4)
-	  )
-	  (match_operand:SI 2 "register_operand" "r")
-	)
+        (plus:SI
+          (mult:SI
+            (match_operand:SI 1 "register_operand" "r")
+            (const_int 4)
+          )
+		  (match_operand:SI 2 "register_operand" "r")
+        )
       )
     )
   ]
@@ -121,17 +139,36 @@
 (define_insn "*vc4_si_load"
   [
     (set
-      (match_operand:SI 0 "register_operand" "=f,r")
+      (match_operand:SI 0 "register_operand" "=f,r,r")
       (mem:SI
-        (match_operand:SI 1 "register_operand" "f,r")
+        (match_operand:SI 1 "nonmemory_operand" "f,r,i")
       )
     )
   ]
   ""
   "@
   	ld %0, (%1)
-  	ld %0, (%1)"
-  [(set_attr "length" "2,4")]
+  	ld %0, (%1)
+  	ld %0, %1"
+  [(set_attr "length" "2,4,4")]
+)
+
+;; --- SI stores ------------------------------------------------------------
+
+(define_insn "*vc4_si_store_pre_decrement"
+  [
+    (set
+      (mem:SI
+        (pre_dec:SI
+          (match_operand:SI 1 "register_operand" "r")
+        )
+      )
+      (match_operand:SI 0 "register_operand" "=r")
+    )
+  ]
+  ""
+  "st %0, --(%1)"
+  [(set_attr "length" "4")]
 )
 
 (define_insn "*vc4_si_store_indexed_by_constant"
