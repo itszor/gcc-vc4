@@ -28,9 +28,9 @@
        (match_test "IN_RANGE (ival, 0, 31)")))
 
 (define_constraint "J"
-  "An integer in the range 1 to 32."
+  "An 6-bit signed integer in the range -32 to 31, used by div ops."
   (and (match_code "const_int")
-       (match_test "IN_RANGE (ival, 1, 32)")))
+       (match_test "IN_RANGE (ival, -32, 31)")))
 
 (define_constraint "K"
   "A shift operand, an integer in the range 0 to 31."

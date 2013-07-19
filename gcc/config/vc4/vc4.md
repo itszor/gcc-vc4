@@ -444,8 +444,8 @@
     (set
       (match_operand:SI 0 "register_operand" "=f,f,f,f,r,r,r,r,r,r,r")
       (minus:SI
-	(match_operand:SI 1 "register_operand" "0,I,0,f,r,I,0,i,0,r,r")
-	(match_operand:SI 2 "nonmemory_operand" "I,0,f,0,I,0,i,0,r,0,r")
+        (match_operand:SI 1 "register_operand" "0,I,0,f,r,I,0,i,0,r,r")
+        (match_operand:SI 2 "nonmemory_operand" "I,0,f,0,I,0,i,0,r,0,r")
       )
     )
   ]
@@ -463,6 +463,40 @@
   	rsb %0, %1 ; slow
   	sub %0, %1, %2"
   [(set_attr "length" "2,2,2,2,4,4,6,6,4,4,4")]
+)
+
+(define_insn "divsi3"
+  [
+    (set
+      (match_operand:SI 0 "register_operand" "=r,r")
+      (div:SI
+        (match_operand:SI 1 "register_operand" "r,r")
+        (match_operand:SI 2 "nonmemory_operand" "r,J")
+      )
+    )
+  ]
+  ""
+  "@
+  	divs %0, %1, %2
+  	divs %0, %1, #%2"
+  [(set_attr "length" "4,4")]
+)
+
+(define_insn "udivsi3"
+  [
+    (set
+      (match_operand:SI 0 "register_operand" "=r,r")
+      (udiv:SI
+        (match_operand:SI 1 "register_operand" "r,r")
+        (match_operand:SI 2 "nonmemory_operand" "r,J")
+      )
+    )
+  ]
+  ""
+  "@
+  	divu %0, %1, %2
+  	divu %0, %1, #%2"
+  [(set_attr "length" "4,4")]
 )
 
 ;; --- Float arithmetic -----------------------------------------------------
