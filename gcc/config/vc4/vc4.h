@@ -611,7 +611,7 @@ extern const enum reg_class regno_reg_class[FIRST_PSEUDO_REGISTER];
 
 /* The machine modes of pointers and functions.  */
 #define Pmode          SImode
-#define FUNCTION_MODE  Pmode
+#define FUNCTION_MODE  HImode
 
 #define WORD_REGISTER_OPERATIONS
 
