@@ -33,9 +33,9 @@
        (match_test "IN_RANGE (ival, -32, 31)")))
 
 (define_constraint "K"
-  "A shift operand, an integer in the range 0 to 31."
+  "A 6-bit unsigned integer in the rand 0 to 63, used by comparison ops."
   (and (match_code "const_int")
-       (match_test "IN_RANGE (ival, 0, 31)")))
+       (match_test "IN_RANGE (ival, 0, 63)")))
 
 (define_constraint "L"
   "A negative arithmetic operand in the range -32 to -1."

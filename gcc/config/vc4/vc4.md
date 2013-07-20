@@ -754,3 +754,84 @@
   "bl %1"
 )
 
+;; --- Conditionals ---------------------------------------------------------
+
+(define_code_iterator condition
+  [
+    ne
+    eq
+    gt
+    gtu
+    lt
+    ltu
+    ge
+    geu
+    le
+    leu
+  ]
+)
+
+(define_code_attr condition_code
+  [
+    (ne "ne")
+    (eq "eq")
+    (gt "gt")
+    (gtu "hi")
+    (lt "lt")
+    (ltu "lo")
+    (ge "ge")
+    (geu "hs")
+    (le "le")
+    (leu "ls")
+  ]
+)
+
+(define_expand "cbranchsi4"
+  [
+    (set (pc)
+      (if_then_else
+        (match_operator 0 "comparison_operator"
+          [
+            (match_operand:SI 1)
+            (match_operand:SI 2)
+          ]
+        )
+        (label_ref
+          (match_operand 3)
+        )
+        (pc)
+      )
+    )
+  ]
+  ""
+  {
+    /* Ensure that comparisons against memory go via a temporary register. */
+    if (GET_CODE(operands[1]) == MEM)
+      operands[1] = force_reg(SImode, operands[1]);
+    if (GET_CODE(operands[2]) == MEM)
+      operands[2] = force_reg(SImode, operands[2]);
+  }
+)
+
+(define_insn "*vc4_conditional_branch_<code>"
+  [
+    (set (pc)
+      (if_then_else
+        (condition
+          (match_operand:SI 0 "register_operand" "f,f")
+          (match_operand:SI 1 "nonmemory_operand" "f,K")
+        )
+        (label_ref
+          (match_operand 2)
+        )
+        (pc)
+      )
+    )
+  ]
+  ""
+  "@
+  	b<condition:condition_code> %0, %1, %2
+  	b<condition:condition_code> %0, #%1, %2"
+  [(set_attr "length" "4,4")]
+)
+
