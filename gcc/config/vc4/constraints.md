@@ -38,14 +38,17 @@
        (match_test "IN_RANGE (ival, 0, 63)")))
 
 (define_constraint "L"
-  "A negative arithmetic operand in the range -32 to -1."
+  "A signed integer in the range -1024 to 1023, used by index memory ops."
   (and (match_code "const_int")
-       (match_test "IN_RANGE (ival, -32, -1)")))
+       (match_test "IN_RANGE (ival, -1024, 1023)")))
 
 (define_constraint "M"
-  "A constant loadable by bgeni."
+  "An unsigned integer in the range 0 to 60, used by the short-form memory
+   ops."
   (and (match_code "const_int")
-       (match_test "exact_log2 (ival) >= 0 && exact_log2 (ival) <= 30")))
+       (match_test "IN_RANGE (ival, 0, 60)")))
+
+
 
 (define_constraint "N"
   "A constant loadable by bmaskii, including -1."

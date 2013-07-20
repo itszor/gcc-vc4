@@ -34,6 +34,11 @@
   ]
 )
 
+(define_mode_iterator QHSI [QI HI SI])
+(define_mode_iterator QHI [QI HI])
+(define_mode_attr suffix [(QI "b") (HI "h") (SI "")])
+
+
 ;; --- Special --------------------------------------------------------------
 
 (define_insn "nop"
@@ -79,13 +84,111 @@
   [(set_attr "length" "2,2,4,6,4")]
 )
 
-;; --- SI loads -------------------------------------------------------------
+;; --- Special loads --------------------------------------------------------
 
-(define_insn "*vc4_si_load_post_increment"
+;; Various special cases not covered by the generic patterns below.
+;; These are above the generic versions to encourage the compiler to prefer
+;; them.
+
+(define_insn "*vc4_si_fast_load"
   [
     (set
-      (match_operand:SI 0 "register_operand" "=r")
+      (match_operand:SI 0 "register_operand" "=f")
       (mem:SI
+        (match_operand:SI 1 "register_operand" "f")
+      )
+    )
+  ]
+  ""
+  "ld %0, (%1) ; fast"
+  [(set_attr "length" "2")]
+)
+
+(define_insn "*vc4_si_load_indexed_by_constant"
+  [
+    (set
+      (match_operand:SI 0 "register_operand" "=f,r,r")
+      (mem:SI
+        (plus:SI
+          (match_operand:SI 2 "register_operand" "f,r,r")
+          (match_operand:SI 1 "const_int_operand" "M,L,i")
+        )
+      )
+    )
+  ]
+  ""
+  "@
+  	ld %0, %1 (%2) ; fast
+  	ld %0, %1 (%2)
+  	ld %0, %1 (%2) ; largeint"
+  [(set_attr "length" "2,4,6")]
+)
+
+(define_insn "*vc4_qi_load_indexed_by_register"
+  [
+    (set
+      (match_operand:QI 0 "register_operand" "=r")
+      (mem:QI
+        (plus:SI
+          (match_operand:SI 1 "register_operand" "r")
+		  (match_operand:SI 2 "register_operand" "r")
+        )
+      )
+    )
+  ]
+  ""
+  "ldb %0, (%1, %2)"
+  [(set_attr "length" "4")]
+)
+
+;; --- Special stores -------------------------------------------------------
+
+;; As for loads.
+
+(define_insn "*vc4_si_fast_store"
+  [
+    (set
+      (mem:SI
+        (match_operand:SI 1 "register_operand" "f")
+      )
+      (match_operand:SI 0 "register_operand" "f")
+    )
+  ]
+  ""
+  "st %0, (%1) ; fast"
+  [(set_attr "length" "2")]
+)
+
+(define_insn "*vc4_si_store_indexed_by_constant"
+  [
+    (set
+      (mem:SI
+        (plus:SI
+          (match_operand:SI 2 "register_operand" "f,r,r")
+          (match_operand:SI 1 "const_int_operand" "M,L,i")
+        )
+      )
+      (match_operand:SI 0 "register_operand" "f,r,r")
+    )
+  ]
+  ""
+  "@
+  	st %0, %1 (%2) ; fast
+  	st %0, %1 (%2)
+  	st %0, %1 (%2) ; largeint"
+  [(set_attr "length" "2,4,6")]
+)
+
+;; --- Generic loads --------------------------------------------------------
+
+;; These work identically across all the different machine modes, so we can
+;; use common patterns for all of them.
+
+(define_insn "*vc4_load_post_increment"
+  [
+    (set
+      (match_operand:QHSI 0 "register_operand" "=r")
+      (mem:QHSI
         (post_inc:SI
           (match_operand:SI 1 "register_operand" "r")
         )
@@ -93,117 +196,118 @@
     )
   ]
   ""
-  "ld %0, (%1)++"
+  "ld<suffix> %0, (%1)++"
   [(set_attr "length" "4")]
 )
 
-(define_insn "*vc4_si_load_indexed_by_register"
+(define_insn "*vc4_load_indexed_by_register"
   [
     (set
-      (match_operand:SI 0 "register_operand" "=r")
-      (mem:SI
+      (match_operand:QHSI 0 "register_operand" "=r")
+      (mem:QHSI
         (plus:SI
           (mult:SI
             (match_operand:SI 1 "register_operand" "r")
-            (const_int 4)
+            (match_operand 3 "const_int_operand")
           )
 		  (match_operand:SI 2 "register_operand" "r")
         )
       )
     )
   ]
-  ""
-  "ld %0, (%2, %1)"
+  "INTVAL(operands[3]) == GET_MODE_SIZE(<MODE>mode)"
+  "ld<suffix> %0, (%2, %1)"
   [(set_attr "length" "4")]
 )
 
-(define_insn "*vc4_si_load_indexed_by_constant"
+(define_insn "*vc4_load_indexed_by_constant"
   [
     (set
-      (match_operand:SI 0 "register_operand" "=f,r")
-      (mem:SI
-	(plus:SI
-	  (match_operand:SI 2 "register_operand" "f,r")
-	  (match_operand:SI 1 "const_int_operand" "I,i")
-	)
+      (match_operand:QHI 0 "register_operand" "=r,r")
+      (mem:QHI
+        (plus:SI
+          (match_operand:SI 2 "register_operand" "r,r")
+          (match_operand:SI 1 "const_int_operand" "L,i")
+        )
       )
     )
   ]
   ""
   "@
-  	ld %0, %1 (%2)
-  	ld %0, %1 (%2)"
-  [(set_attr "length" "2,4")]
+  	ld<suffix> %0, %1 (%2)
+  	ld<suffix> %0, %1 (%2)"
+  [(set_attr "length" "4,6")]
 )
 
-(define_insn "*vc4_si_load"
+(define_insn "*vc4_load_simple"
   [
     (set
-      (match_operand:SI 0 "register_operand" "=f,r,r")
-      (mem:SI
-        (match_operand:SI 1 "nonmemory_operand" "f,r,i")
+      (match_operand:QHSI 0 "register_operand" "=r,r")
+      (mem:QHSI
+        (match_operand:SI 1 "nonmemory_operand" "r,i")
       )
     )
   ]
   ""
   "@
-  	ld %0, (%1)
-  	ld %0, (%1)
-  	ld %0, %1"
-  [(set_attr "length" "2,4,4")]
+  	ld<suffix> %0, (%1)
+  	ld<suffix> %0, %1"
+  [(set_attr "length" "4,4")]
 )
 
-;; --- SI stores ------------------------------------------------------------
+;; --- Generic stores -------------------------------------------------------
 
-(define_insn "*vc4_si_store_pre_decrement"
+;; As for the loads above.
+
+(define_insn "*vc4_store_pre_decrement"
   [
     (set
-      (mem:SI
+      (mem:QHSI
         (pre_dec:SI
           (match_operand:SI 1 "register_operand" "r")
         )
       )
-      (match_operand:SI 0 "register_operand" "=r")
+      (match_operand:QHSI 0 "register_operand" "=r")
     )
   ]
   ""
-  "st %0, --(%1)"
+  "st<suffix> %0, --(%1)"
   [(set_attr "length" "4")]
 )
 
-(define_insn "*vc4_si_store_indexed_by_constant"
+(define_insn "*vc4_store_indexed_by_constant"
   [
     (set
-      (mem:SI
-	(plus:SI
-	  (match_operand:SI 2 "register_operand" "f,r")
-	  (match_operand:SI 1 "const_int_operand" "I,i")
-	)
+      (mem:QHI
+        (plus:SI
+          (match_operand:SI 2 "register_operand" "r,r")
+          (match_operand:SI 1 "const_int_operand" "L,i")
+        )
       )
-      (match_operand:SI 0 "register_operand" "f,r")
+      (match_operand:QHI 0 "register_operand" "r,r")
     )
   ]
   ""
   "@
-  	st %0, %1 (%2)
-  	st %0, %1 (%2)"
-  [(set_attr "length" "2,4")]
+  	st<suffix> %0, %1 (%2)
+  	st<suffix> %0, %1 (%2)"
+  [(set_attr "length" "4,6")]
 )
 
-(define_insn "*vc4_si_stores"
+(define_insn "*vc4_store_simple"
   [
     (set
-      (mem:SI
-	(match_operand:SI 1 "register_operand" "f,r")
+      (mem:QHSI
+        (match_operand:SI 1 "nonmemory_operand" "r,i")
       )
-      (match_operand:SI 0 "register_operand" "f,r")
+      (match_operand:QHSI 0 "register_operand" "r,r")
     )
   ]
   ""
   "@
-  	st %0, (%1)
-  	st %0, (%1)"
-  [(set_attr "length" "2,4")]
+  	st<suffix> %0, (%1)
+  	st<suffix> %0, %1"
+  [(set_attr "length" "4,4")]
 )
 
 ;; --- QI moves -------------------------------------------------------------
@@ -218,7 +322,7 @@
   ""
   {
     if (GET_CODE(operands[0]) == MEM)
-      operands[1] = force_reg(SImode, operands[1]);
+      operands[1] = force_reg(QImode, operands[1]);
   }
 )
 
@@ -249,55 +353,22 @@
   [(set_attr "length" "2,4")]
 )
 
-(define_insn "*vc4_qi_loads"
-  [
-    (set
-      (match_operand:QI 0 "register_operand" "=f,r")
-      (mem:QI
-	(match_operand:SI 1 "register_operand" "f,r")
-      )
-    )
-  ]
-  ""
-  "@
-  	ldb %0, (%1)
-  	ldb %0, (%1)"
-  [(set_attr "length" "2,4")]
-)
+;; --- Special stores -------------------------------------------------------
 
-(define_insn "*vc4_qi_load_indexed_by_constant"
+(define_insn "*vc4_qi_store_indexed_by_register"
   [
     (set
-      (match_operand:QI 0 "register_operand" "=r,r")
       (mem:QI
-	(plus:SI
-	  (match_operand:SI 2 "register_operand" "r,r")
-	  (match_operand:SI 1 "const_int_operand" "I,i")
-	)
+        (plus:SI
+          (match_operand:SI 1 "register_operand" "r")
+		  (match_operand:SI 2 "register_operand" "r")
+        )
       )
+      (match_operand:QI 0 "register_operand" "r")
     )
   ]
   ""
-  "@
-  	ldb %0, %1 (%2)
-  	ldb %0, %1 (%2)"
-  [(set_attr "length" "4,4")]
-)
-
-(define_insn "*vc4_qi_load_indexed"
-  [
-    (set
-      (match_operand:QI 0 "register_operand" "=r")
-      (mem:QI
-	(plus:SI
-	  (match_operand:SI 1 "register_operand" "r")
-	  (match_operand:SI 2 "register_operand" "r")
-	)
-      )
-    )
-  ]
-  ""
-  "ldb %0, (%1, %2)"
+  "stb %0, (%1, %2)"
   [(set_attr "length" "4")]
 )
 
@@ -649,17 +720,15 @@
 (define_insn "zero_extendqisi2"
   [
     (set
-      (match_operand:SI 0 "register_operand" "=f,r")
+      (match_operand:SI 0 "register_operand" "=r")
       (zero_extend:SI
-        (match_operand:QI 1 "general_operand" "0,r")
+        (match_operand:QI 1 "register_operand" "0")
       )
     )
   ]
   ""
-  "@
-  	extu %0, #8
-  	extu %0, %1, #8"
-  [(set_attr "length" "2,4")]
+  "; zero extend %0"
+  [(set_attr "length" "0")]
 )
 
 (define_insn "extendqisi2"
