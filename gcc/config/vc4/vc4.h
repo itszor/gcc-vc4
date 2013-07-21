@@ -164,9 +164,11 @@ enum {
    The values of these macros are register numbers.  */
 
 
-#undef PC_REGNUM                /* Define this if the program counter is overloaded on a register.  */
-#define STACK_POINTER_REGNUM SP_REG     /* Register to use for pushing function arguments.  */
-#define FRAME_POINTER_REGNUM R6_REG     /* When we need FP, use r6.  */
+#undef PC_REGNUM /* This machine has no user-accessible program counter. */
+#define STACK_POINTER_REGNUM SP_REG
+#define FRAME_POINTER_REGNUM R6_REG /* virtual frame pointer */
+//#define HARD_FRAME_POINTER_REGNUM R6_REG /* real frame pointer */
+#define ARG_POINTER_REGNUM AP_REG
 
 /* The assembler's names for the registers.  RFP need not always be used as
    the Real framepointer; it can also be used as a normal general register.
@@ -235,8 +237,6 @@ enum {
    pointer register.  Secondly, the argument pointer register can always be
    eliminated; it is replaced with either the stack or frame pointer.  */
 
-/* Base register for access to arguments of the function.  */
-#define ARG_POINTER_REGNUM AP_REG
 
 /* Register in which the static-chain is passed to a function.  */
 #define STATIC_CHAIN_REGNUM	R0_REG
@@ -245,10 +245,10 @@ enum {
    of eliminable registers.  The "from" register number is given first,
    followed by "to".  Eliminations of the same "from" register are listed
    in order of preference.  */
-#define ELIMINABLE_REGS				\
-{{ FRAME_POINTER_REGNUM, STACK_POINTER_REGNUM},	\
- { ARG_POINTER_REGNUM,   STACK_POINTER_REGNUM},	\
- { ARG_POINTER_REGNUM,   FRAME_POINTER_REGNUM},}
+#define ELIMINABLE_REGS	\
+{{ ARG_POINTER_REGNUM, STACK_POINTER_REGNUM}, \
+ { ARG_POINTER_REGNUM, FRAME_POINTER_REGNUM}, \
+ { FRAME_POINTER_REGNUM, STACK_POINTER_REGNUM}} \
 
 /* Define the offset between two registers, one to be eliminated, and the other
    its replacement, at the start of a routine.  */

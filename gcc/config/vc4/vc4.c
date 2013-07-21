@@ -75,12 +75,12 @@ const enum reg_class regno_reg_class[FIRST_PSEUDO_REGISTER] =
 /*
  * The stack frame layout we're going to use looks like follows.
  * hi   incoming_params
- *      ================== ?ap, fp
+ *      ================== ?ap
  *      callee_saves
- *      ------------------ ?fp
+ *      ------------------
  *      local_vars
  *      local_vars_padding
- *      ------------------
+ *      ------------------ ?fp, fp
  *      outgoing_params
  * lo   ------------------ sp
  * 
@@ -1611,15 +1611,14 @@ int vc4_initial_elimination_offset(int from, int to)
      */
     vc4_compute_frame();
 
-    if (from == HARD_FRAME_POINTER_REGNUM)
-        from = ARG_POINTER_REGNUM;
-    if (to == HARD_FRAME_POINTER_REGNUM)
-        to = ARG_POINTER_REGNUM;
-
     if (from == to)
         ret = 0;
-    else if ((from == FRAME_POINTER_REGNUM) && (to == ARG_POINTER_REGNUM))
-        ret = cfun->machine->callee_saves;
+    else if ((from == FRAME_POINTER_REGNUM) && (to == STACK_POINTER_REGNUM))
+    	ret = crtl->outgoing_args_size;
+    else if ((from == ARG_POINTER_REGNUM) && (to == FRAME_POINTER_REGNUM))
+        ret = cfun->machine->callee_saves +
+              cfun->machine->local_vars +
+              cfun->machine->local_vars_padding;
     else if ((from == ARG_POINTER_REGNUM) && (to == STACK_POINTER_REGNUM))
         ret = cfun->machine->callee_saves +
               cfun->machine->local_vars +
@@ -1726,6 +1725,7 @@ static void vc4_target_asm_function_prologue(FILE *file, HOST_WIDE_INT size)
     fprintf(file, "\t; outgoing = %d bytes\n",
 		crtl->outgoing_args_size);
 	fprintf(file, "\t; needs frame pointer = %d\n", frame_pointer_needed);
+	fprintf(file, "\t; topreg = %d\n", cfun->machine->topreg);
 
     /*
      * Does not include callee_saves, as the push instruction adjusts sp
@@ -1740,7 +1740,7 @@ static void vc4_target_asm_function_prologue(FILE *file, HOST_WIDE_INT size)
     if (cfun->machine->topreg > 0)
     {
 		rtx op = gen_rtx_REG(Pmode, cfun->machine->topreg);
-    	if (cfun->machine->topreg == 6)
+    	if (cfun->machine->topreg == R6_REG)
     		output_asm_insn("push %0, lr", &op);
     	else
     		output_asm_insn("push r6-%0, lr", &op);
@@ -1748,6 +1748,17 @@ static void vc4_target_asm_function_prologue(FILE *file, HOST_WIDE_INT size)
     else
     	output_asm_insn("push lr", NULL);
 
+	/* Allocate space for locals and outgoing. */
+
+    if (sp_adjust > 0)
+    {
+    	rtx ops[2] =
+    	{
+    		stack_pointer_rtx,
+    		GEN_INT(sp_adjust)
+    	};
+    	output_asm_insn("sub %0, #%1", ops);
+    }
 	/* If we need a frame pointer, set it up now. */
 
 	if (frame_pointer_needed)
@@ -1761,15 +1772,6 @@ static void vc4_target_asm_function_prologue(FILE *file, HOST_WIDE_INT size)
 		output_asm_insn("mov %0, %1", ops);
 	}
 
-    if (sp_adjust > 0)
-    {
-    	rtx ops[2] =
-    	{
-    		stack_pointer_rtx,
-    		GEN_INT(sp_adjust)
-    	};
-    	output_asm_insn("sub %0, #%1", ops);
-    }
 }
 
 static void vc4_target_asm_function_epilogue(FILE *file, HOST_WIDE_INT size)
