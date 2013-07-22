@@ -50,7 +50,7 @@
   [(set_attr "length" "2")]
 )
 
-;; --- SI moves -------------------------------------------------------------
+;; --- Move expanders -------------------------------------------------------
 
 (define_expand "movsi"
   [
@@ -67,11 +67,43 @@
   }
 )
 
-(define_insn "*vc4_si_simple_moves"
+(define_expand "movhi"
   [
     (set
-      (match_operand:SI 0 "register_operand" "=f,f,r,r,r")
-      (match_operand:SI 1 "nonmemory_operand" "I,f,I,i,r")
+      (match_operand:QI 0 "general_operand" "")
+      (match_operand:QI 1 "general_operand" "")
+    )
+  ]
+  ""
+  {
+    /* Ensure that mem->mem moves are split via a temporary register. */
+    if (GET_CODE(operands[0]) == MEM)
+      operands[1] = force_reg(HImode, operands[1]);
+  }
+)
+
+(define_expand "movqi"
+  [
+    (set
+      (match_operand:QI 0 "general_operand" "")
+      (match_operand:QI 1 "general_operand" "")
+    )
+  ]
+  ""
+  {
+    /* Ensure that mem->mem moves are split via a temporary register. */
+    if (GET_CODE(operands[0]) == MEM)
+      operands[1] = force_reg(QImode, operands[1]);
+  }
+)
+
+;; --- Generic moves --------------------------------------------------------
+
+(define_insn "*vc4_simple_moves"
+  [
+    (set
+      (match_operand:QHSI 0 "register_operand" "=f,f,r,r,r")
+      (match_operand:QHSI 1 "nonmemory_operand" "I,f,I,i,r")
     )
   ]
   ""
@@ -308,49 +340,6 @@
   	st<suffix> %0, (%1)
   	st<suffix> %0, %1"
   [(set_attr "length" "4,4")]
-)
-
-;; --- QI moves -------------------------------------------------------------
-
-(define_expand "movqi"
-  [
-    (set
-      (match_operand:QI 0 "general_operand" "")
-      (match_operand:QI 1 "general_operand" "")
-    )
-  ]
-  ""
-  {
-    if (GET_CODE(operands[0]) == MEM)
-      operands[1] = force_reg(QImode, operands[1]);
-  }
-)
-
-(define_insn "*vc4_qi_literals"
-  [
-    (set
-      (match_operand:QI 0 "register_operand" "=f")
-      (match_operand:QI 1 "const_int_operand" "I")
-    )
-  ]
-  ""
-  "@
-  	mov %0, %C1"
-  [(set_attr "length" "2")]
-)
-
-(define_insn "*vc4_qi_moves"
-  [
-    (set
-      (match_operand:QI 0 "nonimmediate_operand" "=f,r")
-      (match_operand:QI 1 "register_operand" "f,r")
-    )
-  ]
-  ""
-  "@
-  	mov %0, %1
-  	mov %0, %1"
-  [(set_attr "length" "2,4")]
 )
 
 ;; --- Special stores -------------------------------------------------------
@@ -720,15 +709,33 @@
 (define_insn "zero_extendqisi2"
   [
     (set
-      (match_operand:SI 0 "register_operand" "=r")
+      (match_operand:SI 0 "register_operand" "=f,r")
       (zero_extend:SI
-        (match_operand:QI 1 "register_operand" "0")
+        (match_operand:QI 1 "register_operand" "0,r")
       )
     )
   ]
   ""
-  "; zero extend %0"
-  [(set_attr "length" "0")]
+  "@
+  	extu %0, #8
+	extu %0, %1, #8"
+  [(set_attr "length" "2,4")]
+)
+
+(define_insn "zero_extendhisi2"
+  [
+    (set
+      (match_operand:SI 0 "register_operand" "=f,r")
+      (zero_extend:SI
+        (match_operand:HI 1 "register_operand" "0,r")
+      )
+    )
+  ]
+  ""
+  "@
+  	extu %0, #16
+	extu %0, %1, #16"
+  [(set_attr "length" "2,4")]
 )
 
 (define_insn "extendqisi2"
@@ -744,6 +751,22 @@
   "@
   	exts %0, #8
 	exts %0, %1, #8"
+  [(set_attr "length" "2,4")]
+)
+
+(define_insn "extendhisi2"
+  [
+    (set
+      (match_operand:SI 0 "register_operand" "=f,r")
+      (sign_extend:SI
+        (match_operand:HI 1 "register_operand" "0,r")
+      )
+    )
+  ]
+  ""
+  "@
+  	exts %0, #16
+	exts %0, %1, #16"
   [(set_attr "length" "2,4")]
 )
 
