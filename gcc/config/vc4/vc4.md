@@ -534,15 +534,15 @@
   ""
   "@
   	sub %0, #%2 ; fast smallint
-	rsb %0, #%1 ; fast smallint
+	rsub %0, #%1 ; fast smallint
   	sub %0, %2 ; fast reg
-	rsb %0, %1 ; fast smallint
+	rsub %0, %1 ; fast smallint
   	sub %0, %1, #%2 ; slow smallint
-  	rsb %0, %1, #%1 ; slow smallint
+  	rsub %0, %1, #%1 ; slow smallint
   	sub %0, #%2 ; largeint 2op
-  	rsb %0, #%1 ; largeint 2op
+  	rsub %0, #%1 ; largeint 2op
   	sub %0, %2 ; slow
-  	rsb %0, %1 ; slow
+  	rsub %0, %1 ; slow
   	sub %0, %1, %2"
   [(set_attr "length" "2,2,2,2,4,4,6,6,4,4,4")]
 )
@@ -559,8 +559,8 @@
   ]
   ""
   "@
-  	divs %0, %1, %2
-  	divs %0, %1, #%2"
+  	div.ss %0, %1, %2
+  	div.ss %0, %1, #%2"
   [(set_attr "length" "4,4")]
 )
 
@@ -576,8 +576,8 @@
   ]
   ""
   "@
-  	divu %0, %1, %2
-  	divu %0, %1, #%2"
+  	div.uu %0, %1, %2
+  	div.uu %0, %1, #%2"
   [(set_attr "length" "4,4")]
 )
 
@@ -739,8 +739,8 @@
   ]
   ""
   "@
-  	extu %0, #8
-	extu %0, %1, #8"
+  	bmask %0, #8
+	bmask %0, %1, #8"
   [(set_attr "length" "2,4")]
 )
 
@@ -755,8 +755,8 @@
   ]
   ""
   "@
-  	extu %0, #16
-	extu %0, %1, #16"
+  	bmask %0, #16
+	bmask %0, %1, #16"
   [(set_attr "length" "2,4")]
 )
 
@@ -771,8 +771,8 @@
   ]
   ""
   "@
-  	exts %0, #8
-	exts %0, %1, #8"
+  	signext %0, #8
+	signext %0, %1, #8"
   [(set_attr "length" "2,4")]
 )
 
@@ -787,8 +787,8 @@
   ]
   ""
   "@
-  	exts %0, #16
-	exts %0, %1, #16"
+  	signext %0, #16
+	signext %0, %1, #16"
   [(set_attr "length" "2,4")]
 )
 
