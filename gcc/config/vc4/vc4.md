@@ -244,7 +244,7 @@
             (match_operand:SI 1 "register_operand" "r")
             (match_operand 3 "const_int_operand")
           )
-		  (match_operand:SI 2 "register_operand" "r")
+	  (match_operand:SI 2 "register_operand" "r")
         )
       )
     )
@@ -306,6 +306,26 @@
   ]
   ""
   "st<suffix> %0, --(%1)"
+  [(set_attr "length" "4")]
+)
+
+(define_insn "*vc4_load_indexed_by_register"
+  [
+    (set
+      (mem:QHSI
+        (plus:SI
+          (mult:SI
+            (match_operand:SI 1 "register_operand" "r")
+            (match_operand 3 "const_int_operand")
+          )
+	  (match_operand:SI 2 "register_operand" "r")
+        )
+      )
+      (match_operand:QHSI 0 "register_operand" "r")
+    )
+  ]
+  "INTVAL(operands[3]) == GET_MODE_SIZE(<MODE>mode)"
+  "st<suffix> %0, (%2, %1)"
   [(set_attr "length" "4")]
 )
 
