@@ -436,7 +436,7 @@
     (minus "sub")
     (and "and")
     (rotate "ror")
-    (ior "xor")
+    (ior "or")
     (lshiftrt "lsr")
     (ashift "lsl")
     (ashiftrt "asr")
