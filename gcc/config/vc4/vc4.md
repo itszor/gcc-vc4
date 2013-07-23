@@ -31,12 +31,14 @@
     (GP_REGNO 25)
     (SP_REGNO 26)
     (LR_REGNO 27)
+    (CC_REGNO 29)
   ]
 )
 
 (define_mode_iterator QHSI [QI HI SI])
 (define_mode_iterator QHI [QI HI])
-(define_mode_attr suffix [(QI "b") (HI "h") (SI "")])
+(define_mode_iterator SIF [SI SF])
+(define_mode_attr suffix [(QI "b") (HI "h") (SI "") (SF "")])
 
 
 ;; --- Special --------------------------------------------------------------
@@ -878,18 +880,28 @@
   ]
 )
 
+;; Combined test-and-branch instructions.
+
 (define_expand "cbranchsi4"
   [
-    (set (pc)
+    (set
+      (reg:CC CC_REGNO)
+      (compare:CC
+	(match_operand 1)
+	(match_operand 2)
+      )
+    )
+    (set
+      (pc)
       (if_then_else
         (match_operator 0 "comparison_operator"
           [
-            (match_operand:SI 1)
-            (match_operand:SI 2)
+	    (reg:CC CC_REGNO)
+	    (const_int 0)
           ]
         )
         (label_ref
-          (match_operand 3)
+          (match_operand 3 "" "")
         )
         (pc)
       )
@@ -905,13 +917,43 @@
   }
 )
 
-(define_insn "*vc4_conditional_branch_<code>"
+(define_expand "cbranchsf4"
   [
-    (set (pc)
+    (set
+      (reg:CC CC_REGNO)
+      (compare:CC
+	(match_operand:SF 1 "register_operand")
+	(match_operand:SF 2 "register_operand")
+      )
+    )
+    (set
+      (pc)
+      (if_then_else
+        (match_operator 0 "comparison_operator"
+          [
+	    (reg:CC CC_REGNO)
+	    (const_int 0)
+          ]
+        )
+        (label_ref
+          (match_operand 3 "" "")
+        )
+        (pc)
+      )
+    )
+  ]
+  ""
+  {}
+)
+
+(define_insn "*vc4_test_and_branch_<condition:code>"
+  [
+    (set
+      (pc)
       (if_then_else
         (condition
-          (match_operand:SI 0 "register_operand" "f,f")
-          (match_operand:SI 1 "nonmemory_operand" "f,K")
+	  (match_operand:SI 0 "register_operand" "f,f")
+	  (match_operand:SI 1 "nonmemory_operand" "f,K")
         )
         (label_ref
           (match_operand 2)
@@ -925,5 +967,63 @@
   	b<condition:condition_code> %0, %1, %2
   	b<condition:condition_code> %0, #%1, %2"
   [(set_attr "length" "4,4")]
+)
+
+;; Separated comparisons.
+
+(define_insn "*vc4_test_si"
+  [
+    (set
+      (reg:CC CC_REGNO)
+      (compare
+        (match_operand:SI 0 "register_operand" "f,f,r,r,r")
+        (match_operand:SI 1 "nonmemory_operand" "f,I,r,I,i")
+      )
+    )
+  ]
+  ""
+  "@
+  	cmp %0, %1 ; fast
+	cmp %0, #%1 ; fast
+	cmp %0, %1
+	cmp %0, #%1
+	cmp %0, #%1 ; largeint"
+  [(set_attr "length" "2,2,4,4,6")]
+)
+
+(define_insn "*vc4_test_sf"
+  [
+    (set
+      (reg:CC CC_REGNO)
+      (compare
+        (match_operand:SF 0 "register_operand" "r")
+        (match_operand:SF 1 "register_operand" "r")
+      )
+    )
+  ]
+  ""
+  "fcmp %0, %1, %1"
+  [(set_attr "length" "4")]
+)
+
+(define_insn "*vc4_branch_<condition:code>"
+  [
+    (set
+      (pc)
+      (if_then_else
+        (condition
+	  (reg:CC CC_REGNO)
+	  (const_int 0)
+	)
+	(label_ref
+	  (match_operand 0)
+	)
+	(pc)
+      )
+    )
+  ]
+  ""
+  "b<condition:condition_code> %0"
+  [(set_attr "length" "4")]
 )
 
