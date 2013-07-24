@@ -92,6 +92,9 @@ struct GTY (()) machine_function {
 
     /* Topmost register which needs to be saved (or 0 if none). */
     int topreg;
+
+	/* Does LR need to be saved? */
+	bool lrneedssaving;
 };
 
 /*
@@ -1706,6 +1709,9 @@ static void vc4_compute_frame(void)
     cfun->machine->callee_saves = 4;
     if (cfun->machine->topreg > 0)
         cfun->machine->callee_saves += (cfun->machine->topreg - 5) * 4;
+
+	/* Check to see if lr needs saving. */
+	cfun->machine->lrneedssaving = !leaf_function_p();
 }
 
 static void vc4_target_asm_function_prologue(FILE *file, HOST_WIDE_INT size)
@@ -1713,6 +1719,7 @@ static void vc4_target_asm_function_prologue(FILE *file, HOST_WIDE_INT size)
     rtx insn;
     int sp_adjust;
     int regno;
+	bool pushlr;
 
     vc4_compute_frame();
     fprintf(file, "\t; callee saves = %d bytes\n",
@@ -1723,6 +1730,9 @@ static void vc4_target_asm_function_prologue(FILE *file, HOST_WIDE_INT size)
 		crtl->outgoing_args_size);
 	fprintf(file, "\t; needs frame pointer = %d\n", frame_pointer_needed);
 	fprintf(file, "\t; topreg = %d\n", cfun->machine->topreg);
+	fprintf(file, "\t; lr needs saving = %d\n", cfun->machine->lrneedssaving);
+
+	pushlr = cfun->machine->lrneedssaving;
 
     /*
      * Does not include callee_saves, as the push instruction adjusts sp
@@ -1732,17 +1742,18 @@ static void vc4_target_asm_function_prologue(FILE *file, HOST_WIDE_INT size)
         cfun->machine->local_vars +
         cfun->machine->local_vars_padding + crtl->outgoing_args_size;
 
+	
     /* Save callee-saved registers. */
 
     if (cfun->machine->topreg > 0)
     {
 		rtx op = gen_rtx_REG(Pmode, cfun->machine->topreg);
     	if (cfun->machine->topreg == R6_REG)
-    		output_asm_insn("push %0, lr", &op);
+    		output_asm_insn(pushlr ? "push %0, lr" : "push %0", &op);
     	else
-    		output_asm_insn("push r6-%0, lr", &op);
+    		output_asm_insn(pushlr ? "push r6-%0, lr" : "push r6-%0", &op);
     }
-    else
+    else if (pushlr)
     	output_asm_insn("push lr", NULL);
 
 	/* Allocate space for locals and outgoing. */
@@ -1775,9 +1786,11 @@ static void vc4_target_asm_function_epilogue(FILE *file, HOST_WIDE_INT size)
 {
     rtx insn;
     int regno;
+	bool pushlr;
 
     vc4_compute_frame();
 
+	pushlr = cfun->machine->lrneedssaving;
 
 	if (frame_pointer_needed)
 	{
@@ -1816,12 +1829,15 @@ static void vc4_target_asm_function_epilogue(FILE *file, HOST_WIDE_INT size)
     {
 		rtx op = gen_rtx_REG(Pmode, cfun->machine->topreg);
     	if (cfun->machine->topreg == 6)
-    		output_asm_insn("pop %0, pc", &op);
+    		output_asm_insn(pushlr ? "pop %0, pc" : "pop %0", &op);
     	else
-    		output_asm_insn("pop r6-%0, pc", &op);
+    		output_asm_insn(pushlr ? "pop r6-%0, pc" : "pop r6-%0", &op);
     }
-    else
+    else if (pushlr)
     	output_asm_insn("pop pc", NULL);
+
+	if (!pushlr)
+		output_asm_insn("rts", NULL);
 }
 
 
