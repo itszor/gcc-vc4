@@ -49,8 +49,6 @@
 #undef TARGET_8ALIGN
 #define TARGET_8ALIGN 1
 
-extern char *mcore_current_function_name;
-
 /* Target machine storage Layout.  */
 
 #define PROMOTE_MODE(MODE,UNSIGNEDP,TYPE)  	\
@@ -354,7 +352,7 @@ extern const enum reg_class regno_reg_class[FIRST_PSEUDO_REGISTER];
 /* Return the maximum number of consecutive registers
    needed to represent mode MODE in a register of class CLASS. 
 
-   On MCore this is the size of MODE in words.  */
+   On the VC4 this is the size of MODE in words.  */
 #define CLASS_MAX_NREGS(CLASS, MODE)  \
      (ROUND_ADVANCE (GET_MODE_SIZE (MODE)))
 
@@ -386,26 +384,22 @@ extern const enum reg_class regno_reg_class[FIRST_PSEUDO_REGISTER];
 /* Offset of first parameter from the argument pointer register value.  */
 #define FIRST_PARM_OFFSET(FNDECL)  0
 
-/* Define how to find the value returned by a function.
-   VALTYPE is the data type of the value (as a tree).
-   If the precise function being called is known, FUNC is its FUNCTION_DECL;
-   otherwise, FUNC is 0.  */
-#define FUNCTION_VALUE(VALTYPE, FUNC)  mcore_function_value (VALTYPE, FUNC)
-
 /* Don't default to pcc-struct-return, because gcc is the only compiler, and
    we want to retain compatibility with older gcc versions.  */
 #define DEFAULT_PCC_STRUCT_RETURN 0
 
 /* Define how to find the value returned by a library function
    assuming the value has mode MODE.  */
-#define LIBCALL_VALUE(MODE)  gen_rtx_REG (MODE, FIRST_RET_REG)
+#define LIBCALL_VALUE(MODE) \
+	gen_rtx_REG (MODE, FIRST_RET_REG)
 
 /* 1 if N is a possible register number for a function value.
-   On the MCore, only r4 can return results.  */
-#define FUNCTION_VALUE_REGNO_P(REGNO)  ((REGNO) == FIRST_RET_REG)
+   On the VC4, only r0 and r1 can return results.  */
+#define FUNCTION_VALUE_REGNO_P(REGNO) \
+	(((REGNO) == FIRST_RET_REG) || ((REGNO) == (FIRST_RET_REG+1)))
 
 /* 1 if N is a possible register number for function argument passing.  */
-#define FUNCTION_ARG_REGNO_P(REGNO)  \
+#define FUNCTION_ARG_REGNO_P(REGNO) \
   ((REGNO) >= FIRST_PARM_REG && (REGNO) < (NPARM_REGS + FIRST_PARM_REG))
 
 /* Define a data type for recording info about an argument list
@@ -414,7 +408,7 @@ extern const enum reg_class regno_reg_class[FIRST_PSEUDO_REGISTER];
    and about the args processed so far, enough to enable macros
    such as FUNCTION_ARG to determine where the next arg should go.
 
-   On MCore, this is a single integer, which is a number of words
+   On the VC4, this is a single integer, which is a number of words
    of arguments scanned so far (including the invisible argument,
    if any, which holds the structure-value-address).
    Thus NARGREGS or more means all following args should go on the stack.  */
@@ -424,13 +418,9 @@ extern const enum reg_class regno_reg_class[FIRST_PSEUDO_REGISTER];
   ((SIZE + UNITS_PER_WORD - 1) / UNITS_PER_WORD)
 
 /* Round a register number up to a proper boundary for an arg of mode 
-   MODE. 
+   MODE. None needed on the VC4. */
    
-   We round to an even reg for things larger than a word.  */
-#define ROUND_REG(X, MODE) 				\
-  ((TARGET_8ALIGN 					\
-   && GET_MODE_UNIT_SIZE ((MODE)) > UNITS_PER_WORD) 	\
-   ? ((X) + ((X) & 1)) : (X))
+#define ROUND_REG(REG, MODE) REG
 
 /* We have postincrement and predecrement, and want to use them. */
 
@@ -441,7 +431,7 @@ extern const enum reg_class regno_reg_class[FIRST_PSEUDO_REGISTER];
    for a call to a function whose data type is FNTYPE.
    For a library call, FNTYPE is 0.
 
-   On MCore, the offset always starts at 0: the first parm reg is always
+   On the VC4, the offset always starts at 0: the first parm reg is always
    the same reg.  */
 #define INIT_CUMULATIVE_ARGS(CUM, FNTYPE, LIBNAME, INDIRECT, N_NAMED_ARGS) \
   ((CUM) = 0)
@@ -633,7 +623,7 @@ extern const enum reg_class regno_reg_class[FIRST_PSEUDO_REGISTER];
 
 /* Switch into a generic section.  */
 #undef  TARGET_ASM_NAMED_SECTION
-#define TARGET_ASM_NAMED_SECTION  mcore_asm_named_section
+#define TARGET_ASM_NAMED_SECTION vc4_asm_named_section
 
 #define INCOMING_RETURN_ADDR_RTX gen_rtx_REG (SImode, LR_REG)
 
@@ -679,34 +669,6 @@ extern const enum reg_class regno_reg_class[FIRST_PSEUDO_REGISTER];
 
 #define SUPPORTS_ONE_ONLY 1
 
-/* A pair of macros to output things for the callgraph data.
-   VALUE means (to the tools that reads this info later):
-  	0 a call from src to dst
-  	1 the call is special (e.g. dst is "unknown" or "alloca")
-  	2 the call is special (e.g., the src is a table instead of routine)
-  
-   Frame sizes are augmented with timestamps to help later tools 
-   differentiate between static entities with same names in different
-   files.  */
-extern long mcore_current_compilation_timestamp;
-#define	ASM_OUTPUT_CG_NODE(FILE,SRCNAME,VALUE)				\
-  do									\
-    {									\
-      if (mcore_current_compilation_timestamp == 0)			\
-        mcore_current_compilation_timestamp = time (0);			\
-      fprintf ((FILE),"\t.equ\t__$frame$size$_%s_$_%08lx,%d\n",		\
-             (SRCNAME), mcore_current_compilation_timestamp, (VALUE));	\
-    }									\
-  while (0)
-
-#define	ASM_OUTPUT_CG_EDGE(FILE,SRCNAME,DSTNAME,VALUE)		\
-  do								\
-    {								\
-      fprintf ((FILE),"\t.equ\t__$function$call$_%s_$_%s,%d\n",	\
-             (SRCNAME), (DSTNAME), (VALUE));			\
-    }								\
-  while (0)
-
 /* Globalizing directive for a label.  */
 #define GLOBAL_ASM_OP "\t.export\t"
 
@@ -740,44 +702,5 @@ extern long mcore_current_compilation_timestamp;
 #undef  ASM_OUTPUT_SKIP
 #define ASM_OUTPUT_SKIP(FILE,SIZE)  \
   fprintf (FILE, "\t.fill %d, 1\n", (int)(SIZE))
-
-/* This says how to output an assembler line
-   to define a global common symbol, with alignment information.  */
-/* XXX - for now we ignore the alignment.  */
-#undef  ASM_OUTPUT_ALIGNED_COMMON
-#define ASM_OUTPUT_ALIGNED_COMMON(FILE, NAME, SIZE, ALIGN)	\
-  do								\
-    {								\
-      if (mcore_dllexport_name_p (NAME))			\
-	MCORE_EXPORT_NAME (FILE, NAME)				\
-      if (! mcore_dllimport_name_p (NAME))			\
-        {							\
-          fputs ("\t.comm\t", FILE);				\
-          assemble_name (FILE, NAME);				\
-          fprintf (FILE, ",%lu\n", (unsigned long)(SIZE));	\
-        }							\
-    }								\
-  while (0)
-
-/* This says how to output an assembler line
-   to define a local common symbol....  */
-#undef  ASM_OUTPUT_LOCAL
-#define ASM_OUTPUT_LOCAL(FILE, NAME, SIZE, ROUNDED)	\
-  (fputs ("\t.lcomm\t", FILE),				\
-  assemble_name (FILE, NAME),				\
-  fprintf (FILE, ",%d\n", (int)SIZE))
-
-/* ... and how to define a local common symbol whose alignment
-   we wish to specify.  ALIGN comes in as bits, we have to turn
-   it into bytes.  */
-#undef  ASM_OUTPUT_ALIGNED_LOCAL
-#define ASM_OUTPUT_ALIGNED_LOCAL(FILE, NAME, SIZE, ALIGN)		\
-  do									\
-    {									\
-      fputs ("\t.bss\t", (FILE));					\
-      assemble_name ((FILE), (NAME));					\
-      fprintf ((FILE), ",%d,%d\n", (int)(SIZE), (ALIGN) / BITS_PER_UNIT);\
-    }									\
-  while (0)
 
 #endif                          /* ! GCC_VC4_H */

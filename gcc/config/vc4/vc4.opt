@@ -1,4 +1,4 @@
-; Options for the Motorola MCore port of the compiler.
+; Options for the Broadcom Videocore IV port of the compiler.
 
 ; Copyright (C) 2005-2013 Free Software Foundation, Inc.
 ;

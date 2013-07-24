@@ -21,8 +21,8 @@
  * <http://www.gnu.org/licenses/>.
  */
 
-#ifndef __MCORE_ELF_H__
-#define __MCORE_ELF_H__
+#ifndef __VC4_ELF_H__
+#define __VC4_ELF_H__
 
 /* Use DWARF2 debugging info.  */
 #define DWARF2_DEBUGGING_INFO 1
@@ -30,57 +30,6 @@
 #undef  PREFERRED_DEBUGGING_TYPE
 #define PREFERRED_DEBUGGING_TYPE DWARF2_DEBUG
 
-#define MCORE_EXPORT_NAME(STREAM, NAME)			\
-  do							\
-    {							\
-      fprintf (STREAM, "\t.section .exports\n");	\
-      fprintf (STREAM, "\t.ascii \" -export:%s\"\n",	\
-	       (* targetm.strip_name_encoding) (NAME));	\
-      in_section = NULL;				\
-    }							\
-  while (0);
-
-/* Write the extra assembler code needed to declare a function properly.
-   Some svr4 assemblers need to also have something extra said about the
-   function's return value.  We allow for that here.  */
-#undef  ASM_DECLARE_FUNCTION_NAME
-#define ASM_DECLARE_FUNCTION_NAME(FILE, NAME, DECL)		\
-  do								\
-    {								\
-      if (mcore_dllexport_name_p (NAME))			\
-	{							\
-          MCORE_EXPORT_NAME (FILE, NAME);			\
-	  switch_to_section (function_section (DECL));		\
-	}							\
-      ASM_OUTPUT_TYPE_DIRECTIVE (FILE, NAME, "function");	\
-      ASM_DECLARE_RESULT (FILE, DECL_RESULT (DECL));		\
-      ASM_OUTPUT_LABEL (FILE, NAME);				\
-    }								\
-  while (0)
-
-/* Write the extra assembler code needed to declare an object properly.  */
-#undef  ASM_DECLARE_OBJECT_NAME
-#define ASM_DECLARE_OBJECT_NAME(FILE, NAME, DECL)		\
-  do								\
-    {								\
-      HOST_WIDE_INT size;					\
-      if (mcore_dllexport_name_p (NAME))			\
-        {							\
-	  section *save_section = in_section;			\
-	  MCORE_EXPORT_NAME (FILE, NAME);			\
-	  switch_to_section (save_section);			\
-        }							\
-      ASM_OUTPUT_TYPE_DIRECTIVE (FILE, NAME, "object");		\
-      size_directive_output = 0;				\
-      if (!flag_inhibit_size_directive && DECL_SIZE (DECL))	\
-        {							\
-          size_directive_output = 1;				\
-	  size = int_size_in_bytes (TREE_TYPE (DECL));		\
-	  ASM_OUTPUT_SIZE_DIRECTIVE (FILE, NAME, size);		\
-        }							\
-      ASM_OUTPUT_LABEL(FILE, NAME);				\
-    }								\
-  while (0)
 
 /* Output the size directive for a decl in rest_of_decl_compilation
    in the case where we did not do so before the initializer.
@@ -125,4 +74,4 @@
 #undef  DTORS_SECTION_ASM_OP
 #define DTORS_SECTION_ASM_OP	"\t.section\t.dtors,\"aw\""
 
-#endif                          /* __MCORE_ELF_H__ */
+#endif
