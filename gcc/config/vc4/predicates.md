@@ -1,4 +1,4 @@
-;; Predicate definitions for Motorola MCore.
+;; Predicate definitions for the Broadcom Videocore IV
 ;; Copyright (C) 2005-2013 Free Software Foundation, Inc.
 ;;
 ;; This file is part of GCC.

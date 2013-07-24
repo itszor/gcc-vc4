@@ -1,4 +1,4 @@
-;; Constraint definitions for the Motorola MCore
+;; Constraint definitions for the Broadcom Videocore IV
 ;; Copyright (C) 2011-2013 Free Software Foundation, Inc.
 
 ;; This file is part of GCC.
@@ -49,57 +49,3 @@
        (match_test "IN_RANGE (ival, 0, 60)")))
 
 
-
-(define_constraint "N"
-  "A constant loadable by bmaskii, including -1."
-  (and (match_code "const_int")
-       (ior (match_test "ival == -1")
-	    (and (match_test "exact_log2 (ival + 1) >= 0")
-		 (match_test "exact_log2 (ival + 1) <= 30")))))
-
-(define_constraint "O"
-  "A constant allowed by cmov with two constants +/- 1 of each other."
-  (and (match_code "const_int")
-       (ior (match_test "insn_const_int_ok_for_constraint (ival, CONSTRAINT_I)")
-	    (match_test "insn_const_int_ok_for_constraint (ival, CONSTRAINT_M)")
-	    (match_test "insn_const_int_ok_for_constraint (ival, CONSTRAINT_N)")
-	    (match_test "insn_const_int_ok_for_constraint (ival - 1, CONSTRAINT_M)")
-	    (match_test "insn_const_int_ok_for_constraint (ival + 1, CONSTRAINT_N)"))))
-
-(define_constraint "P"
-  "A value that can be generated without an lrw instruction."
-  (and (match_code "const_int")
-       (match_test "mcore_const_ok_for_inline (ival)")))
-
-;; Floating-point constraints.
-(define_constraint "G"
-  "@internal"
-  (and (match_code "const_double")
-       (match_test "insn_const_int_ok_for_constraint (hval, CONSTRAINT_I)")
-       (match_test "insn_const_int_ok_for_constraint (ival, CONSTRAINT_I)")))
-
-;; Other constraints.
-(define_constraint "Q"
-  "The integer constant one."
-  (and (match_code "const_int")
-       (match_test "ival == 1")))
-
-(define_constraint "R"
-  "@internal"
-  (and (match_code "mem")
-       (match_test "GET_CODE (XEXP (op, 0)) == LABEL_REF")))
-
-(define_constraint "S"
-  "An integer constant with 0, 1, or 2 bits clear."
-  (and (match_code "const_int")
-       (match_test "mcore_num_zeros (ival) <= 2")))
-
-(define_constraint "T"
-  "The integer constant two."
-  (and (match_code "const_int")
-       (match_test "ival == 2")))
-
-(define_constraint "U"
-  "The integer constant zero."
-  (and (match_code "const_int")
-       (match_test "ival == 0")))
