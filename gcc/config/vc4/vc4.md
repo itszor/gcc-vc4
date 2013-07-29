@@ -124,18 +124,22 @@
 ;; These are above the generic versions to encourage the compiler to prefer
 ;; them.
 
+;; This must work with r as well as f to allow reload to eliminate ?ap.
+
 (define_insn "*vc4_si_fast_load"
   [
     (set
-      (match_operand:SI 0 "register_operand" "=f")
+      (match_operand:SI 0 "register_operand" "=f,r")
       (mem:SI
-        (match_operand:SI 1 "register_operand" "f")
+        (match_operand:SI 1 "register_operand" "f,r")
       )
     )
   ]
   ""
-  "ld %0, (%1) ; fast"
-  [(set_attr "length" "2")]
+  "@
+  	ld %0, (%1) ; fast
+  	ld %0, (%1)"
+  [(set_attr "length" "4")]
 )
 
 (define_insn "*vc4_si_load_indexed_by_constant"
@@ -179,18 +183,22 @@
 
 ;; As for loads.
 
+;; This must work with r as well as f to allow reload to eliminate ?ap.
+
 (define_insn "*vc4_si_fast_store"
   [
     (set
       (mem:SI
-        (match_operand:SI 1 "register_operand" "f")
+        (match_operand:SI 1 "register_operand" "f,r")
       )
-      (match_operand:SI 0 "register_operand" "f")
+      (match_operand:SI 0 "register_operand" "f,r")
     )
   ]
   ""
-  "st %0, (%1) ; fast"
-  [(set_attr "length" "2")]
+  "@
+  	st %0, (%1) ; fast
+  	st %0, (%1)"
+  [(set_attr "length" "2,4")]
 )
 
 (define_insn "*vc4_si_store_indexed_by_constant"

@@ -74,10 +74,10 @@ const enum reg_class regno_reg_class[FIRST_PSEUDO_REGISTER] =
  *      ------------------
  *      local_vars
  *      local_vars_padding
- *      ------------------ ?fp, fp
+ *      ------------------ fp, ?fp
  *      outgoing_params
  * lo   ------------------ sp
- * 
+ *
  */
 struct GTY (()) machine_function {
     int callee_saves;
@@ -391,40 +391,46 @@ static int number_of_regs_before_varargs;
  */
 static int current_function_anonymous_args;
 
-#define	STACK_BYTES (STACK_BOUNDARY/BITS_PER_UNIT)
-#define	STORE_REACH (64)        /* Maximum displace of word store + 4.  */
-#define	ADDI_REACH (32)         /* Maximum addi operand.  */
+/* Calculates the offset needed to convert accesses to the specified register
+ * to instead be an access to the stack pointer. */
+
+static int register_offset(int reg)
+{
+	int offset = 0;
+
+	switch (reg)
+	{
+		default:
+			abort();
+
+
+		case ARG_POINTER_REGNUM:
+			offset += cfun->machine->callee_saves;
+			/* fall through */
+			offset += cfun->machine->local_vars +
+			          cfun->machine->local_vars_padding;
+			/* fall through */
+		case HARD_FRAME_POINTER_REGNUM:
+		case FRAME_POINTER_REGNUM:
+			/* fall through */
+			offset += crtl->outgoing_args_size;
+			/* fall through */
+		case STACK_POINTER_REGNUM:
+			break;
+	}
+
+	return offset;
+}
 
 /*
- * Implements the macro INITIAL_ELIMINATION_OFFSET, return the OFFSET.  
+ * Implements the macro INITIAL_ELIMINATION_OFFSET. Returns the offset
+ * between the two specified registers.
  */
 
 int vc4_initial_elimination_offset(int from, int to)
 {
-    int ret;
-
-    /*
-     * Compute this since we need to use cfun->machine->local_vars_size.  
-     */
     vc4_compute_frame();
-
-    if (from == to)
-        ret = 0;
-    else if ((from == FRAME_POINTER_REGNUM) && (to == STACK_POINTER_REGNUM))
-    	ret = crtl->outgoing_args_size;
-    else if ((from == ARG_POINTER_REGNUM) && (to == FRAME_POINTER_REGNUM))
-        ret = cfun->machine->callee_saves +
-              cfun->machine->local_vars +
-              cfun->machine->local_vars_padding;
-    else if ((from == ARG_POINTER_REGNUM) && (to == STACK_POINTER_REGNUM))
-        ret = cfun->machine->callee_saves +
-              cfun->machine->local_vars +
-              cfun->machine->local_vars_padding +
-              crtl->outgoing_args_size;
-    else
-        abort();
-
-    return ret;
+	return register_offset(to) - register_offset(from);
 }
 
 /*
@@ -503,12 +509,13 @@ static void vc4_compute_frame(void)
             cfun->machine->topreg = regno;
         }
 
-    cfun->machine->callee_saves = 4;
+	/* Check to see if lr needs saving. */
+	cfun->machine->lrneedssaving = !leaf_function_p();
+
+    cfun->machine->callee_saves = (cfun->machine->lrneedssaving ? 4 : 0);
     if (cfun->machine->topreg > 0)
         cfun->machine->callee_saves += (cfun->machine->topreg - 5) * 4;
 
-	/* Check to see if lr needs saving. */
-	cfun->machine->lrneedssaving = !leaf_function_p();
 }
 
 static void vc4_target_asm_function_prologue(FILE *file, HOST_WIDE_INT size)
@@ -531,15 +538,6 @@ static void vc4_target_asm_function_prologue(FILE *file, HOST_WIDE_INT size)
 
 	pushlr = cfun->machine->lrneedssaving;
 
-    /*
-     * Does not include callee_saves, as the push instruction adjusts sp
-     * for us.
-     */
-    sp_adjust =
-        cfun->machine->local_vars +
-        cfun->machine->local_vars_padding + crtl->outgoing_args_size;
-
-	
     /* Save callee-saved registers. */
 
     if (cfun->machine->topreg > 0)
@@ -553,7 +551,15 @@ static void vc4_target_asm_function_prologue(FILE *file, HOST_WIDE_INT size)
     else if (pushlr)
     	output_asm_insn("push lr", NULL);
 
-	/* Allocate space for locals and outgoing. */
+    /* Does not include callee_saves, as the push instruction adjusts sp
+     * for us. */
+
+    sp_adjust =
+        cfun->machine->local_vars +
+        cfun->machine->local_vars_padding +
+        crtl->outgoing_args_size;
+
+	/* Allocate space for locals. */
 
     if (sp_adjust > 0)
     {
@@ -564,17 +570,19 @@ static void vc4_target_asm_function_prologue(FILE *file, HOST_WIDE_INT size)
     	};
     	output_asm_insn("sub %0, #%1", ops);
     }
+
 	/* If we need a frame pointer, set it up now. */
 
 	if (frame_pointer_needed)
 	{
 		rtx ops[] =
 		{
-			gen_rtx_REG(Pmode, FRAME_POINTER_REGNUM),
-			gen_rtx_REG(Pmode, STACK_POINTER_REGNUM)
+			gen_rtx_REG(Pmode, HARD_FRAME_POINTER_REGNUM),
+			gen_rtx_REG(Pmode, STACK_POINTER_REGNUM),
+			GEN_INT(crtl->outgoing_args_size)
 		};
 
-		output_asm_insn("mov %0, %1", ops);
+		output_asm_insn("add %0, %1, #%2", ops);
 	}
 
 }
@@ -584,40 +592,26 @@ static void vc4_target_asm_function_epilogue(FILE *file, HOST_WIDE_INT size)
     rtx insn;
     int regno;
 	bool pushlr;
+	int sp_adjust;
 
     vc4_compute_frame();
 
 	pushlr = cfun->machine->lrneedssaving;
 
-	if (frame_pointer_needed)
-	{
-		/* If we had a frame pointer, reset the stack. */
+	/* Otherwise retract over the locals. */
 
-		rtx ops[] =
+	sp_adjust = cfun->machine->local_vars +
+		cfun->machine->local_vars_padding + crtl->outgoing_args_size;
+
+	if (sp_adjust > 0)
+	{
+		rtx ops[2] =
 		{
-			gen_rtx_REG(Pmode, FRAME_POINTER_REGNUM),
-			gen_rtx_REG(Pmode, STACK_POINTER_REGNUM)
+			stack_pointer_rtx,
+			GEN_INT(sp_adjust)
 		};
-
-		output_asm_insn("mov %1, %0", ops);
+		output_asm_insn("add %0, #%1", ops);
 	}
-	else
-	{
-		/* Otherwise retract over the locals. */
-
-		int sp_adjust = cfun->machine->local_vars +
-			cfun->machine->local_vars_padding + crtl->outgoing_args_size;
-
-		if (sp_adjust > 0)
-		{
-			rtx ops[2] =
-			{
-				stack_pointer_rtx,
-				GEN_INT(sp_adjust)
-			};
-			output_asm_insn("sub %0, #%1", ops);
-		}
-    }
 
     /*
      * Reload callee-saved registers and return.
