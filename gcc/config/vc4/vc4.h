@@ -152,8 +152,12 @@ enum {
     R0_REG, R1_REG, R2_REG, R3_REG, R4_REG, R5_REG, R6_REG, R7_REG,
     R8_REG, R9_REG, R10_REG, R11_REG, R12_REG, R13_REG, R14_REG, R15_REG,
     R16_REG, R17_REG, R18_REG, R19_REG, R20_REG, R21_REG, R22_REG, R23_REG,
-    GP_REG, SP_REG, LR_REG,
-    AP_REG, FP_REG, CC_REG,
+    GP_REG, /* 24 */
+    SP_REG, /* 25 */
+    LR_REG, /* 26 */
+    AP_REG, /* 27 */
+    FP_REG, /* 28 */
+    CC_REG, /* 29 */
 
     FIRST_PSEUDO_REGISTER
 };
@@ -164,9 +168,9 @@ enum {
 
 #undef PC_REGNUM /* This machine has no user-accessible program counter. */
 #define STACK_POINTER_REGNUM SP_REG
-#define FRAME_POINTER_REGNUM R6_REG /* virtual frame pointer */
-//#define HARD_FRAME_POINTER_REGNUM R6_REG /* real frame pointer */
-#define ARG_POINTER_REGNUM AP_REG
+#define FRAME_POINTER_REGNUM FP_REG /* virtual frame pointer */
+#define HARD_FRAME_POINTER_REGNUM R6_REG /* real frame pointer */
+#define ARG_POINTER_REGNUM AP_REG /* virtual argument pointer */
 
 /* The assembler's names for the registers.  RFP need not always be used as
    the Real framepointer; it can also be used as a normal general register.
@@ -244,9 +248,11 @@ enum {
    followed by "to".  Eliminations of the same "from" register are listed
    in order of preference.  */
 #define ELIMINABLE_REGS	\
-{{ ARG_POINTER_REGNUM, STACK_POINTER_REGNUM}, \
- { ARG_POINTER_REGNUM, FRAME_POINTER_REGNUM}, \
- { FRAME_POINTER_REGNUM, STACK_POINTER_REGNUM}} \
+{{ ARG_POINTER_REGNUM, STACK_POINTER_REGNUM }, \
+ { ARG_POINTER_REGNUM, FRAME_POINTER_REGNUM }, \
+ { ARG_POINTER_REGNUM, HARD_FRAME_POINTER_REGNUM }, \
+ { FRAME_POINTER_REGNUM, STACK_POINTER_REGNUM }, \
+ { FRAME_POINTER_REGNUM, HARD_FRAME_POINTER_REGNUM }}
 
 /* Define the offset between two registers, one to be eliminated, and the other
    its replacement, at the start of a routine.  */
@@ -304,12 +310,11 @@ enum reg_class {
    This is an initializer for a vector of HARD_REG_SET
    of length N_REG_CLASSES.  */
 
-/* ??? STACK_POINTER_REGNUM should be excluded from LRW_REGS.  */
 #define REG_CLASS_CONTENTS \
 { \
   {0x00000000},  /* NO_REGS */ \
   {0x0000ffff},  /* FAST_REGS */ \
-  {0x07ffffff},  /* GENERAL_REGS */ \
+  {0x1fffffff},  /* GENERAL_REGS */ \
   {0x3fffffff}   /* ALL_REGS */ \
 }
 
@@ -366,7 +371,7 @@ extern const enum reg_class regno_reg_class[FIRST_PSEUDO_REGISTER];
 
 /* Define this if pushing a word on the stack
    makes the stack pointer a smaller address.  */
-#define STACK_GROWS_DOWNWARD
+#define STACK_GROWS_DOWNWARD 1
 
 /* Offset within stack frame to start allocating local variables at.
    If FRAME_GROWS_DOWNWARD, this is the offset to the END of the
@@ -487,7 +492,7 @@ extern const enum reg_class regno_reg_class[FIRST_PSEUDO_REGISTER];
 /* Nonzero if X is a hard reg that can be used as a base reg
    or if it is a pseudo reg.  */
 #define REG_OK_FOR_BASE_P(X) \
-    	(REGNO (X) <= 16 || REGNO (X) >= FIRST_PSEUDO_REGISTER)
+    	(REGNO (X) <= AP_REG || REGNO (X) >= FIRST_PSEUDO_REGISTER)
 
 /* Nonzero if X is a hard reg that can be used as an index
    or if it is a pseudo reg.  */
@@ -600,7 +605,6 @@ extern const enum reg_class regno_reg_class[FIRST_PSEUDO_REGISTER];
    shouldn't be put through pseudo regs where they can be cse'd.
    Desirable on machines where ordinary constants are expensive
    but a CALL with constant address is cheap.  */
-/* Why is this defined??? -- dac */
 #define NO_FUNCTION_CSE 1
 
 /* The machine modes of pointers and functions.  */
