@@ -114,7 +114,7 @@
   	mov %0, %1 ; fast
   	mov %0, #%1 ; slow smallint
   	mov %0, #%1 ; largeint
-  	mov %0, %1 ; slow"
+  	mov %0, %0, %1 ; slow"
   [(set_attr "length" "2,2,4,6,4")]
 )
 
@@ -440,7 +440,7 @@
   [
     (plus "add")
     (mult "mul")
-    (xor "xor")
+    (xor "eor")
     (minus "sub")
     (and "and")
     (rotate "ror")
@@ -567,8 +567,8 @@
   ]
   ""
   "@
-  	div.ss %0, %1, %2
-  	div.ss %0, %1, #%2"
+  	divss %0, %1, %2
+  	divss %0, %1, #%2"
   [(set_attr "length" "4,4")]
 )
 
@@ -584,8 +584,8 @@
   ]
   ""
   "@
-  	div.uu %0, %1, %2
-  	div.uu %0, %1, #%2"
+  	divuu %0, %1, %2
+  	divuu %0, %1, #%2"
   [(set_attr "length" "4,4")]
 )
 
@@ -652,8 +652,7 @@
     )
   ]
   ""
-  "@
-  	<fpu_list_3op:fpu_opcode> %0, %1, %2"
+  "<fpu_list_3op:fpu_opcode> %0, %1, %2"
   [(set_attr "length" "4")]
 )
 
@@ -667,8 +666,7 @@
     )
   ]
   ""
-  "@
-  	<fpu_list_2op:fpu_opcode> %0, %1, %1"
+  "<fpu_list_2op:fpu_opcode> %0, %1, %1"
   [(set_attr "length" "4")]
 )
 
@@ -684,8 +682,7 @@
     )
   ]
   ""
-  "@
-  	ftrunc %0, %1, sasl #0"
+  "ftrunc %0, %1 ; sasl #0"
   [(set_attr "length" "4")]
 )
 
@@ -699,8 +696,7 @@
     )
   ]
   ""
-  "@
-  	ftrunc %0, %1, sasl #0"
+  "ftrunc %0, %1; sasl #0"
   [(set_attr "length" "4")]
 )
 
@@ -729,8 +725,7 @@
     )
   ]
   ""
-  "@
-  	fltu %0, %1, sasr #0"
+  "fltu %0, %1, sasr #0"
   [(set_attr "length" "4")]
 )
 
@@ -844,6 +839,13 @@
   "bl %0"
 )
 
+(define_insn "*vc4_call_indirect"
+  [(call (mem:HI (match_operand:SI 0 "register_operand" "r"))
+	 (match_operand 1 "" ""))]
+  ""
+  "bl %0"
+  [(set_attr "length" "2")])
+
 ;; Call a function *with* a return value.
 
 (define_expand "call_value"
@@ -875,6 +877,15 @@
   ""
   "bl %1"
 )
+
+(define_insn "*vc4_call_value_indirect"
+  [(set (match_operand 0 "register_operand" "=r")
+	(call (mem:HI (match_operand:SI 1 "register_operand" "r"))
+	      (match_operand 2 "" "")))]
+  ""
+  "bl %1"
+  [(set_attr "length" "2")])
+
 
 ;; --- Conditionals ---------------------------------------------------------
 
@@ -974,6 +985,8 @@
   {}
 )
 
+;; This is disabled for now because it doesn't understand limited offset range.
+
 (define_insn "*vc4_test_and_branch_<condition:code>"
   [
     (set
@@ -990,7 +1003,7 @@
       )
     )
   ]
-  ""
+  "0"
   "@
   	b<condition:condition_code> %0, %1, %2
   	b<condition:condition_code> %0, #%1, %2"

@@ -194,6 +194,9 @@ tilepro*-*-*)
 v850*-*-*)
 	cpu_type=v850
 	;;
+vc4-*-*)
+	cpu_type=vc4
+	;;
 tic6x-*-*)
 	cpu_type=c6x
 	;;
@@ -1298,6 +1301,8 @@ vax-*-linux*)
 vax-*-netbsdelf*)
 	;;
 vax-*-openbsd*)
+	;;
+vc4-*-elf)
 	;;
 visium-*-elf*)
         extra_parts="$extra_parts crtbegin.o crtend.o crti.o crtn.o"

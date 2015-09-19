@@ -101,46 +101,7 @@ static struct machine_function *vc4_init_machine_status(void)
 }
 
 static void vc4_compute_frame(void);
-static void vc4_setup_incoming_varargs(cumulative_args_t,
-                                       enum machine_mode, tree, int *,
-                                       int);
-static rtx handle_structs_in_regs(enum machine_mode, const_tree, int);
 static tree vc4_handle_naked_attribute(tree *, tree, tree, int, bool *);
-#ifdef OBJECT_FORMAT_ELF
-static void vc4_asm_named_section(const char *, unsigned int, tree);
-#endif
-static void vc4_print_operand(FILE *, rtx, int);
-static void vc4_print_operand_address(FILE *, rtx);
-static bool vc4_print_operand_punct_valid_p(unsigned char code);
-static void vc4_external_libcall(rtx);
-static bool vc4_return_in_memory(const_tree, const_tree);
-static int vc4_arg_partial_bytes(cumulative_args_t,
-                                 enum machine_mode, tree, bool);
-static rtx vc4_function_arg(cumulative_args_t,
-                            enum machine_mode, const_tree, bool);
-static void vc4_function_arg_advance(cumulative_args_t,
-                                     enum machine_mode, const_tree, bool);
-static unsigned int vc4_function_arg_boundary(enum machine_mode,
-                                              const_tree);
-static rtx vc4_function_value(const_tree valtype, const_tree func,
-		bool outgoing);
-static bool vc4_warn_func_return(tree);
-static void vc4_option_override(void);
-static bool vc4_legitimate_constant_p(enum machine_mode, rtx);
-
-static void vc4_target_asm_function_prologue(FILE *file, HOST_WIDE_INT size);
-
-static void vc4_target_asm_function_epilogue(FILE *file, HOST_WIDE_INT size);
-
-static int vc4_target_register_move_cost(enum machine_mode mode,
-                                         reg_class_t from, reg_class_t to);
-static int vc4_target_memory_move_cost(enum machine_mode mode,
-                                       reg_class_t rclass, bool in);
-static int vc4_target_address_cost(rtx address,
-                                   enum machine_mode mode,
-                                   addr_space_t as, bool speed);
-static bool vc4_target_rtx_costs(rtx, int, int, int, int *, bool);
-
 static int num_arg_regs(enum machine_mode mode, const_tree type);
 
 /*
@@ -156,99 +117,20 @@ static const struct attribute_spec vc4_attribute_table[] = {
      false},
     {NULL, 0, 0, false, false, false, NULL, false}
 };
-
-/*
- * Initialize the GCC target structure.  
- */
-#undef  TARGET_ASM_EXTERNAL_LIBCALL
-#define TARGET_ASM_EXTERNAL_LIBCALL	vc4_external_libcall
 
-#ifdef OBJECT_FORMAT_ELF
-#undef  TARGET_ASM_UNALIGNED_HI_OP
-#define TARGET_ASM_UNALIGNED_HI_OP "\t.short\t"
-#undef  TARGET_ASM_UNALIGNED_SI_OP
-#define TARGET_ASM_UNALIGNED_SI_OP "\t.long\t"
-#endif
-
-#undef  TARGET_PRINT_OPERAND
-#define TARGET_PRINT_OPERAND	        vc4_print_operand
-
-#undef  TARGET_ATTRIBUTE_TABLE
-#define TARGET_ATTRIBUTE_TABLE          vc4_attribute_table
-#undef  TARGET_ASM_FUNCTION_RODATA_SECTION
-#define TARGET_ASM_FUNCTION_RODATA_SECTION default_no_function_rodata_section
-
-#undef  TARGET_PROMOTE_FUNCTION_MODE
-#define TARGET_PROMOTE_FUNCTION_MODE	default_promote_function_mode_always_promote
-#undef  TARGET_PROMOTE_PROTOTYPES
-#define TARGET_PROMOTE_PROTOTYPES	hook_bool_const_tree_true
-
-#undef  TARGET_RETURN_IN_MEMORY
-#define TARGET_RETURN_IN_MEMORY         vc4_return_in_memory
-#undef  TARGET_MUST_PASS_IN_STACK
-#define TARGET_MUST_PASS_IN_STACK	must_pass_in_stack_var_size
-#undef  TARGET_PASS_BY_REFERENCE
-#define TARGET_PASS_BY_REFERENCE  hook_pass_by_reference_must_pass_in_stack
-#undef  TARGET_ARG_PARTIAL_BYTES
-#define TARGET_ARG_PARTIAL_BYTES	vc4_arg_partial_bytes
-#undef  TARGET_FUNCTION_ARG
-#define TARGET_FUNCTION_ARG		vc4_function_arg
-#undef  TARGET_FUNCTION_ARG_ADVANCE
-#define TARGET_FUNCTION_ARG_ADVANCE	vc4_function_arg_advance
-#undef  TARGET_FUNCTION_ARG_BOUNDARY
-#define TARGET_FUNCTION_ARG_BOUNDARY	vc4_function_arg_boundary
-
-#undef  TARGET_FUNCTION_VALUE
-#define TARGET_FUNCTION_VALUE           vc4_function_value
-
-#undef  TARGET_SETUP_INCOMING_VARARGS
-#define TARGET_SETUP_INCOMING_VARARGS	vc4_setup_incoming_varargs
-
-#undef TARGET_OPTION_OVERRIDE
-#define TARGET_OPTION_OVERRIDE          vc4_option_override
-
-#undef TARGET_LEGITIMATE_CONSTANT_P
-#define TARGET_LEGITIMATE_CONSTANT_P    vc4_legitimate_constant_p
-
-#undef TARGET_WARN_FUNC_RETURN
-#define TARGET_WARN_FUNC_RETURN         vc4_warn_func_return
-
-#if 0
-#undef TARGET_LRA_P
-#define TARGET_LRA_P hook_bool_void_true
-#endif
-
-#undef TARGET_ASM_FUNCTION_PROLOGUE
-#define TARGET_ASM_FUNCTION_PROLOGUE    vc4_target_asm_function_prologue
-
-#undef TARGET_ASM_FUNCTION_EPILOGUE
-#define TARGET_ASM_FUNCTION_EPILOGUE    vc4_target_asm_function_epilogue
-
-#undef TARGET_REGISTER_MOVE_COST
-#define TARGET_REGISTER_MOVE_COST       vc4_target_register_move_cost
-
-#undef TARGET_MEMORY_MOVE_COST
-#define TARGET_MEMORY_MOVE_COST         vc4_target_memory_move_cost
-
-#undef  TARGET_ADDRESS_COST
-#define TARGET_ADDRESS_COST 		vc4_target_address_cost
-
-#undef TARGET_RTX_COSTS
-#define TARGET_RTX_COSTS                vc4_target_rtx_costs
-
-struct gcc_target targetm = TARGET_INITIALIZER;
 
 /*
  * Compute cost of moving data between one register class and another.
  * Fast registers are cheap, everything else is expensive. 
  */
 static int
-vc4_target_register_move_cost(enum machine_mode mode, reg_class_t from,
-                              reg_class_t to)
+vc4_target_register_move_cost (enum machine_mode mode ATTRIBUTE_UNUSED,
+			       reg_class_t from, reg_class_t to)
 {
-    if ((from == FAST_REGS) && (to == from))
-        return 2;
-    return 4;
+  if ((from == FAST_REGS) && (to == from))
+    return 2;
+
+  return 4;
 }
 
 /*
@@ -256,12 +138,13 @@ vc4_target_register_move_cost(enum machine_mode mode, reg_class_t from,
  * indirections. Slow registers are slow. 
  */
 static int
-vc4_target_memory_move_cost(enum machine_mode mode, reg_class_t rclass,
-                            bool in)
+vc4_target_memory_move_cost (enum machine_mode mode ATTRIBUTE_UNUSED,
+			     reg_class_t rclass, bool in ATTRIBUTE_UNUSED)
 {
-    if (rclass == FAST_REGS)
-        return 0;
-    return 2;
+  if (rclass == FAST_REGS)
+    return 0;
+
+  return 2;
 }
 
 /*
@@ -269,10 +152,12 @@ vc4_target_memory_move_cost(enum machine_mode mode, reg_class_t rclass,
  * mode. On the VC4, all addressing modes cost the same. 
  */
 static int
-vc4_target_address_cost(rtx address, enum machine_mode mode,
-                        addr_space_t as, bool speed)
+vc4_target_address_cost (rtx address ATTRIBUTE_UNUSED,
+			 enum machine_mode mode ATTRIBUTE_UNUSED,
+                         addr_space_t as ATTRIBUTE_UNUSED,
+			 bool speed ATTRIBUTE_UNUSED)
 {
-    return 0;
+  return 0;
 }
 
 /*
@@ -306,77 +191,73 @@ static void vc4_print_operand(FILE * stream, rtx x, int code)
 }
 
 static bool
-vc4_target_rtx_costs(rtx x, int code, int outer_code,
-                     int opno ATTRIBUTE_UNUSED, int *total,
-                     bool speed ATTRIBUTE_UNUSED)
+vc4_target_rtx_costs (rtx x, int code, int outer_code ATTRIBUTE_UNUSED,
+		      int opno ATTRIBUTE_UNUSED, int *total,
+		      bool speed ATTRIBUTE_UNUSED)
 {
-    enum machine_mode mode = GET_MODE(x);
-    bool value = false;
+  enum machine_mode mode = GET_MODE (x);
+  bool value = false;
 
-    switch (code)
+  switch (code)
     {
-        case MEM:
-        {
-            value = true;
-            if (REG_P(XEXP(x, 0)))
-                *total = COSTS_N_INSNS(2);
-            else if (GET_CODE(XEXP(x, 0)) == PLUS)
+      case MEM:
+	{
+          value = true;
+          if (REG_P(XEXP(x, 0)))
+            *total = COSTS_N_INSNS(2);
+          else if (GET_CODE(XEXP(x, 0)) == PLUS)
             {
-                rtx left = XEXP(XEXP(x, 0), 0);
-                rtx right = XEXP(XEXP(x, 0), 1);
-                /*
-                 * Test for ra[rb] 
-                 */
-                if ((GET_CODE(left) == MULT)
-                    && REG_P(XEXP(left, 0))
-                    && CONST_INT_P(XEXP(left, 1))
-                    && REG_P(right)
-                    && (INTVAL(XEXP(left, 1)) == GET_MODE_SIZE(mode)))
-                    *total = COSTS_N_INSNS(2);
-                /*
-                 * Test for ra[rb] where ra is a byte* 
-                 */
-                else if ((mode == QImode) && REG_P(left) && REG_P(right))
-                    *total = COSTS_N_INSNS(2);
-                /*
-                 * Test for ra[const] 
-                 */
-                else if (REG_P(left) && CONST_INT_P(right))
-                    *total = COSTS_N_INSNS(2);
-                else
-                    value = false;      /* don't know */
+              rtx left = XEXP(XEXP(x, 0), 0);
+              rtx right = XEXP(XEXP(x, 0), 1);
+              /*
+               * Test for ra[rb] 
+               */
+              if ((GET_CODE(left) == MULT)
+                  && REG_P(XEXP(left, 0))
+                  && CONST_INT_P(XEXP(left, 1))
+                  && REG_P(right)
+                  && (INTVAL(XEXP(left, 1)) == GET_MODE_SIZE(mode)))
+        	*total = COSTS_N_INSNS(2);
+              /* Test for ra[rb] where ra is a byte*.  */
+              else if ((mode == QImode) && REG_P(left) && REG_P(right))
+                *total = COSTS_N_INSNS(2);
+              /* Test for ra[const].  */
+              else if (REG_P(left) && CONST_INT_P(right))
+                *total = COSTS_N_INSNS(2);
+              else
+                value = false;      /* don't know */
             }
-            else
-                value = false;
-            break;
-        }
+          else
+            value = false;
+          break;
+	}
 
-        case CONST_INT:
-        case CONST:
-        case LABEL_REF:
-        case SYMBOL_REF:
-        case CONST_DOUBLE:
-            *total = 0;
-            value = true;
-            break;
+      case CONST_INT:
+      case CONST:
+      case LABEL_REF:
+      case SYMBOL_REF:
+      case CONST_DOUBLE:
+        *total = 0;
+        value = true;
+        break;
 
-        case AND:
-        case IOR:
-            value = 1;
-            break;
+      case AND:
+      case IOR:
+        value = 1;
+        break;
 
-        case DIV:
-        case UDIV:
-        case MOD:
-        case UMOD:
-        case FLOAT:
-        case FIX:
-            *total = COSTS_N_INSNS(100);
-            value = true;
-            break;
+      case DIV:
+      case UDIV:
+      case MOD:
+      case UMOD:
+      case FLOAT:
+      case FIX:
+        *total = COSTS_N_INSNS(100);
+        value = true;
+        break;
     }
 
-    return value;
+  return value;
 }
 
 
@@ -475,122 +356,111 @@ vc4_setup_incoming_varargs(cumulative_args_t args_so_far_v,
  * prologue and epilogue.  
  */
 
-static void vc4_compute_frame(void)
+static void vc4_compute_frame (void)
 {
-    /*
-     * For aligning the local variables.  
-     */
-    int stack_alignment = STACK_BOUNDARY / BITS_PER_UNIT;
-    int padding_locals;
-    int regno;
-    int savedregs;
+  /* For aligning the local variables.  */
+  int stack_alignment = STACK_BOUNDARY / BITS_PER_UNIT;
+  int padding_locals;
+  int regno;
 
-    /*
-     * Padding needed for each element of the frame.  
-     */
-    cfun->machine->local_vars = get_frame_size();
+  /* Padding needed for each element of the frame.  */
+  cfun->machine->local_vars = get_frame_size();
 
-    /*
-     * Align to the stack alignment.  
-     */
-    padding_locals = cfun->machine->local_vars % stack_alignment;
-    if (padding_locals)
-        padding_locals = stack_alignment - padding_locals;
+  /* Align to the stack alignment.  */
+  padding_locals = cfun->machine->local_vars % stack_alignment;
 
-    cfun->machine->local_vars_padding = padding_locals;
+  if (padding_locals)
+    padding_locals = stack_alignment - padding_locals;
 
-    /*
-     * Save callee-saved registers.  
-     */
-    cfun->machine->topreg = 0;
-    for (regno = 0; regno < FIRST_PSEUDO_REGISTER; regno++)
-        if (df_regs_ever_live_p(regno) && (!call_used_regs[regno]))
-        {
-            cfun->machine->topreg = regno;
-        }
+  cfun->machine->local_vars_padding = padding_locals;
 
-	/* Check to see if lr needs saving. */
-	cfun->machine->lrneedssaving = !leaf_function_p();
+  /* Save callee-saved registers.  */
+  cfun->machine->topreg = 0;
 
-    cfun->machine->callee_saves = (cfun->machine->lrneedssaving ? 4 : 0);
-    if (cfun->machine->topreg > 0)
-        cfun->machine->callee_saves += (cfun->machine->topreg - 5) * 4;
+  for (regno = 0; regno < FIRST_PSEUDO_REGISTER; regno++)
+    if (df_regs_ever_live_p (regno) && (!call_used_regs[regno]))
+      cfun->machine->topreg = regno;
 
+  /* Check to see if lr needs saving. */
+  cfun->machine->lrneedssaving = !leaf_function_p ();
+
+  cfun->machine->callee_saves = (cfun->machine->lrneedssaving ? 4 : 0);
+
+  if (cfun->machine->topreg > 0)
+    cfun->machine->callee_saves += (cfun->machine->topreg - 5) * 4;
 }
 
-static void vc4_target_asm_function_prologue(FILE *file, HOST_WIDE_INT size)
+static void
+vc4_target_asm_function_prologue (FILE *file,
+				  HOST_WIDE_INT size ATTRIBUTE_UNUSED)
 {
-    rtx insn;
-    int sp_adjust;
-    int regno;
-	bool pushlr;
+  int sp_adjust;
+  bool pushlr;
 
-    vc4_compute_frame();
-    fprintf(file, "\t; callee saves = %d bytes\n",
-		cfun->machine->callee_saves);
-    fprintf(file, "\t; local vars = %d+%d bytes\n",
-		cfun->machine->local_vars, cfun->machine->local_vars_padding);
-    fprintf(file, "\t; outgoing = %d bytes\n",
-		crtl->outgoing_args_size);
-	fprintf(file, "\t; needs frame pointer = %d\n", frame_pointer_needed);
-	fprintf(file, "\t; topreg = %d\n", cfun->machine->topreg);
-	fprintf(file, "\t; lr needs saving = %d\n", cfun->machine->lrneedssaving);
+  vc4_compute_frame ();
 
-	pushlr = cfun->machine->lrneedssaving;
+  fprintf (file, "\t; callee saves = %d bytes\n", cfun->machine->callee_saves);
+  fprintf (file, "\t; local vars = %d+%d bytes\n", cfun->machine->local_vars,
+	   cfun->machine->local_vars_padding);
+  fprintf (file, "\t; outgoing = %d bytes\n", crtl->outgoing_args_size);
 
-    /* Save callee-saved registers. */
+  fprintf (file, "\t; needs frame pointer = %d\n", frame_pointer_needed);
+  fprintf (file, "\t; topreg = %d\n", cfun->machine->topreg);
+  fprintf (file, "\t; lr needs saving = %d\n", cfun->machine->lrneedssaving);
 
-    if (cfun->machine->topreg > 0)
+  pushlr = cfun->machine->lrneedssaving;
+
+  /* Save callee-saved registers. */
+
+  if (cfun->machine->topreg > 0)
     {
-		rtx op = gen_rtx_REG(Pmode, cfun->machine->topreg);
-    	if (cfun->machine->topreg == R6_REG)
-    		output_asm_insn(pushlr ? "push %0, lr" : "push %0", &op);
-    	else
-    		output_asm_insn(pushlr ? "push r6-%0, lr" : "push r6-%0", &op);
+      rtx op = gen_rtx_REG (Pmode, cfun->machine->topreg);
+
+      if (cfun->machine->topreg == R6_REG)
+	output_asm_insn (pushlr ? "push %0, lr" : "push %0", &op);
+      else
+	output_asm_insn (pushlr ? "push r6-%0, lr" : "push r6-%0", &op);
     }
-    else if (pushlr)
-    	output_asm_insn("push lr", NULL);
+  else if (pushlr)
+    output_asm_insn ("push lr", NULL);
 
-    /* Does not include callee_saves, as the push instruction adjusts sp
-     * for us. */
+  /* Does not include callee_saves, as the push instruction adjusts sp
+     for us. */
 
-    sp_adjust =
-        cfun->machine->local_vars +
-        cfun->machine->local_vars_padding +
-        crtl->outgoing_args_size;
+  sp_adjust = cfun->machine->local_vars + cfun->machine->local_vars_padding
+	      + crtl->outgoing_args_size;
 
-	/* Allocate space for locals. */
+  /* Allocate space for locals. */
 
-    if (sp_adjust > 0)
+  if (sp_adjust > 0)
     {
-    	rtx ops[2] =
-    	{
-    		stack_pointer_rtx,
-    		GEN_INT(sp_adjust)
-    	};
-    	output_asm_insn("sub %0, #%1", ops);
-    }
-
-	/* If we need a frame pointer, set it up now. */
-
-	if (frame_pointer_needed)
+      rtx ops[2] =
 	{
-		rtx ops[] =
-		{
-			gen_rtx_REG(Pmode, HARD_FRAME_POINTER_REGNUM),
-			gen_rtx_REG(Pmode, STACK_POINTER_REGNUM),
-			GEN_INT(crtl->outgoing_args_size)
-		};
+    	  stack_pointer_rtx,
+    	  GEN_INT (sp_adjust)
+	};
+      output_asm_insn ("sub %0, #%1", ops);
+    }
 
-		output_asm_insn("add %0, %1, #%2", ops);
-	}
+  /* If we need a frame pointer, set it up now. */
 
+  if (frame_pointer_needed)
+    {
+      rtx ops[] =
+	{
+	  gen_rtx_REG (Pmode, HARD_FRAME_POINTER_REGNUM),
+	  gen_rtx_REG (Pmode, STACK_POINTER_REGNUM),
+	  GEN_INT (crtl->outgoing_args_size)
+	};
+
+      output_asm_insn("add %0, %1, #%2", ops);
+    }
 }
 
-static void vc4_target_asm_function_epilogue(FILE *file, HOST_WIDE_INT size)
+static void
+vc4_target_asm_function_epilogue (FILE *file ATTRIBUTE_UNUSED,
+				  HOST_WIDE_INT size ATTRIBUTE_UNUSED)
 {
-    rtx insn;
-    int regno;
 	bool pushlr;
 	int sp_adjust;
 
@@ -714,7 +584,9 @@ handle_structs_in_regs(enum machine_mode mode, const_tree type, int reg)
 /* TARGET_FUNCTION_VALUE: return RTX that represents where a function
  * return goes. */
 
-rtx vc4_function_value(const_tree valtype, const_tree func, bool outgoing)
+rtx
+vc4_function_value (const_tree valtype, const_tree func,
+		    bool outgoing ATTRIBUTE_UNUSED)
 {
     enum machine_mode mode;
     int unsigned_p;
@@ -864,24 +736,12 @@ static bool vc4_warn_func_return(tree decl)
     return lookup_attribute("naked", DECL_ATTRIBUTES(decl)) == NULL_TREE;
 }
 
-#ifdef OBJECT_FORMAT_ELF
 static void
-vc4_asm_named_section(const char *name,
-                        unsigned int flags ATTRIBUTE_UNUSED,
-                        tree decl ATTRIBUTE_UNUSED)
+vc4_asm_named_section (const char *name,
+                       unsigned int flags ATTRIBUTE_UNUSED,
+                       tree decl ATTRIBUTE_UNUSED)
 {
-    fprintf(asm_out_file, "\t.section %s\n", name);
-}
-#endif /* OBJECT_FORMAT_ELF */
-
-/* TARGET_ASM_EXTERNAL_LIBCALL: import an extern symbol reference.
- */
-
-static void vc4_external_libcall(rtx fun)
-{
-    fprintf(asm_out_file, "\t.import\t");
-    assemble_name(asm_out_file, XSTR(fun, 0));
-    fprintf(asm_out_file, "\n");
+  fprintf (asm_out_file, "\t.section %s\n", name);
 }
 
 /* TARGET_RETURN_IN_MEMORY: decides whether a value can be returned in
@@ -895,6 +755,38 @@ vc4_return_in_memory(const_tree type, const_tree fntype ATTRIBUTE_UNUSED)
     return (size == -1 || size > 2 * UNITS_PER_WORD);
 }
 
+static bool
+vc4_address_register_p (rtx x, bool strict)
+{
+  return REG_P (x)
+	 && (REGNO (x) < AP_REG
+	     || (!strict
+		 && (REGNO (x) >= FIRST_PSEUDO_REGISTER
+		     || REGNO (x) == FRAME_POINTER_REGNUM
+		     || REGNO (x) == ARG_POINTER_REGNUM)));
+}
+
+static bool
+vc4_legitimate_address_p (enum machine_mode mode, rtx x, bool strict)
+{
+  if (CONSTANT_ADDRESS_P (x))
+    return true;
+
+  if (vc4_address_register_p (x, strict))
+    return true;
+
+  if (GET_CODE (x) == PLUS
+      && vc4_address_register_p (XEXP (x, 0), strict)
+      && GET_CODE (XEXP (x, 1)) == CONST_INT
+      && INTVAL (XEXP (x, 1)) >= -0x40000000
+      && INTVAL (XEXP (x, 1)) < 0x40000000)
+    return true;
+
+  /* !!! (reg, reg) addressing also appears to be available.  */
+
+  return false;
+}
+
 /*
  * Implement TARGET_LEGITIMATE_CONSTANT_P
  * 
@@ -906,5 +798,87 @@ vc4_legitimate_constant_p(enum machine_mode mode ATTRIBUTE_UNUSED, rtx x)
 {
     return GET_CODE(x) != CONST_DOUBLE;
 }
+
+/*
+ * Initialize the GCC target structure.  
+ */
+#ifdef OBJECT_FORMAT_ELF
+#undef  TARGET_ASM_UNALIGNED_HI_OP
+#define TARGET_ASM_UNALIGNED_HI_OP "\t.short\t"
+#undef  TARGET_ASM_UNALIGNED_SI_OP
+#define TARGET_ASM_UNALIGNED_SI_OP "\t.long\t"
+#endif
+
+#undef  TARGET_PRINT_OPERAND
+#define TARGET_PRINT_OPERAND	        vc4_print_operand
+
+#undef  TARGET_ATTRIBUTE_TABLE
+#define TARGET_ATTRIBUTE_TABLE          vc4_attribute_table
+#undef  TARGET_ASM_FUNCTION_RODATA_SECTION
+#define TARGET_ASM_FUNCTION_RODATA_SECTION default_no_function_rodata_section
+
+#undef  TARGET_PROMOTE_FUNCTION_MODE
+#define TARGET_PROMOTE_FUNCTION_MODE	default_promote_function_mode_always_promote
+#undef  TARGET_PROMOTE_PROTOTYPES
+#define TARGET_PROMOTE_PROTOTYPES	hook_bool_const_tree_true
+
+#undef  TARGET_RETURN_IN_MEMORY
+#define TARGET_RETURN_IN_MEMORY         vc4_return_in_memory
+#undef  TARGET_MUST_PASS_IN_STACK
+#define TARGET_MUST_PASS_IN_STACK	must_pass_in_stack_var_size
+#undef  TARGET_PASS_BY_REFERENCE
+#define TARGET_PASS_BY_REFERENCE  hook_pass_by_reference_must_pass_in_stack
+#undef  TARGET_ARG_PARTIAL_BYTES
+#define TARGET_ARG_PARTIAL_BYTES	vc4_arg_partial_bytes
+#undef  TARGET_FUNCTION_ARG
+#define TARGET_FUNCTION_ARG		vc4_function_arg
+#undef  TARGET_FUNCTION_ARG_ADVANCE
+#define TARGET_FUNCTION_ARG_ADVANCE	vc4_function_arg_advance
+#undef  TARGET_FUNCTION_ARG_BOUNDARY
+#define TARGET_FUNCTION_ARG_BOUNDARY	vc4_function_arg_boundary
+
+#undef  TARGET_FUNCTION_VALUE
+#define TARGET_FUNCTION_VALUE           vc4_function_value
+
+#undef  TARGET_SETUP_INCOMING_VARARGS
+#define TARGET_SETUP_INCOMING_VARARGS	vc4_setup_incoming_varargs
+
+#undef TARGET_OPTION_OVERRIDE
+#define TARGET_OPTION_OVERRIDE          vc4_option_override
+
+#undef TARGET_LEGITIMATE_ADDRESS_P
+#define TARGET_LEGITIMATE_ADDRESS_P	vc4_legitimate_address_p
+
+#undef TARGET_LEGITIMATE_CONSTANT_P
+#define TARGET_LEGITIMATE_CONSTANT_P    vc4_legitimate_constant_p
+
+#undef TARGET_WARN_FUNC_RETURN
+#define TARGET_WARN_FUNC_RETURN         vc4_warn_func_return
+
+#undef TARGET_LRA_P
+#define TARGET_LRA_P hook_bool_void_true
+
+#undef TARGET_ASM_FUNCTION_PROLOGUE
+#define TARGET_ASM_FUNCTION_PROLOGUE    vc4_target_asm_function_prologue
+
+#undef TARGET_ASM_FUNCTION_EPILOGUE
+#define TARGET_ASM_FUNCTION_EPILOGUE    vc4_target_asm_function_epilogue
+
+#undef TARGET_REGISTER_MOVE_COST
+#define TARGET_REGISTER_MOVE_COST       vc4_target_register_move_cost
+
+#undef TARGET_MEMORY_MOVE_COST
+#define TARGET_MEMORY_MOVE_COST         vc4_target_memory_move_cost
+
+#undef  TARGET_ADDRESS_COST
+#define TARGET_ADDRESS_COST 		vc4_target_address_cost
+
+#undef TARGET_RTX_COSTS
+#define TARGET_RTX_COSTS                vc4_target_rtx_costs
+
+#undef TARGET_ASM_NAMED_SECTION
+#define TARGET_ASM_NAMED_SECTION vc4_asm_named_section
+
+struct gcc_target targetm = TARGET_INITIALIZER;
 
 #include "gt-vc4.h"

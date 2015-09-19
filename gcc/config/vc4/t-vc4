@@ -17,7 +17,7 @@
 # <http://www.gnu.org/licenses/>.
 
 # We have values for float.h.
-CROSS_FLOAT_H = $(srcdir)/config/vc4/gfloat.h
+#CROSS_FLOAT_H = $(srcdir)/config/vc4/gfloat.h
 
 # If support for -m4align is ever re-enabled then comment out the
 # following line and uncomment the multilib lines below.
@@ -28,5 +28,5 @@ CROSS_FLOAT_H = $(srcdir)/config/vc4/gfloat.h
 # MULTILIB_EXTRA_OPTS  = 
 # MULTILIB_EXCEPTIONS  =
 
-MULTILIB_OPTIONS     = mlittle-endian
-MULTILIB_DIRNAMES    = little
+#MULTILIB_OPTIONS     = mlittle-endian
+#MULTILIB_DIRNAMES    = little
