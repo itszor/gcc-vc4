@@ -478,85 +478,6 @@ extern const enum reg_class regno_reg_class[FIRST_PSEUDO_REGISTER];
    address.  */
 #define MAX_REGS_PER_ADDRESS 1
 
-/* Recognize any constant value that is a valid address.  */
-#define CONSTANT_ADDRESS_P(X) 	 (GET_CODE (X) == LABEL_REF)
-
-/* The macros REG_OK_FOR..._P assume that the arg is a REG rtx
-   and check its validity for a certain class.
-   We have two alternate definitions for each of them.
-   The usual definition accepts all pseudo regs; the other rejects
-   them unless they have been allocated suitable hard regs.
-   The symbol REG_OK_STRICT causes the latter definition to be used.  */
-#ifndef REG_OK_STRICT
-
-/* Nonzero if X is a hard reg that can be used as a base reg
-   or if it is a pseudo reg.  */
-#define REG_OK_FOR_BASE_P(X) \
-    	(REGNO (X) <= AP_REG || REGNO (X) >= FIRST_PSEUDO_REGISTER)
-
-/* Nonzero if X is a hard reg that can be used as an index
-   or if it is a pseudo reg.  */
-#define REG_OK_FOR_INDEX_P(X)	0
-
-#else
-
-/* Nonzero if X is a hard reg that can be used as a base reg.  */
-#define REG_OK_FOR_BASE_P(X)	\
-	REGNO_OK_FOR_BASE_P (REGNO (X))
-
-/* Nonzero if X is a hard reg that can be used as an index.  */
-#define REG_OK_FOR_INDEX_P(X)	0
-
-#endif
-
-/* GO_IF_LEGITIMATE_ADDRESS recognizes an RTL expression
-   that is a valid memory address for an instruction.
-   The MODE argument is the machine mode for the MEM expression
-   that wants to use this address.
-
-   The other macros defined here are used only in GO_IF_LEGITIMATE_ADDRESS.  */
-#define BASE_REGISTER_RTX_P(X)  \
-  (GET_CODE (X) == REG && REG_OK_FOR_BASE_P (X))
-
-#define INDEX_REGISTER_RTX_P(X)  \
-  (GET_CODE (X) == REG && REG_OK_FOR_INDEX_P (X))
-
-
-/* Jump to LABEL if X is a valid address RTX.  This must also take
-   REG_OK_STRICT into account when deciding about valid registers, but it uses
-   the above macros so we are in luck.  
- 
-   Allow  REG
-	  REG+disp 
-
-   A legitimate index for disp is 27 bits wide (-0x4000000 to 0x3ffffff). */
-#define GO_IF_LEGITIMATE_INDEX(MODE, REGNO, OP, LABEL) \
-  do \
-    { \
-      if (GET_CODE (OP) == CONST_INT)  \
-        { \
-	  signed HOST_WIDE_INT o = INTVAL (OP); \
-	  if ((o >= -0x4000000) && (o <= 0x3ffffff)) \
-	    goto LABEL; \
-        } \
-    } \
-  while (0)
-
-#define GO_IF_LEGITIMATE_ADDRESS(MODE, X, LABEL)                  \
-{ 								  \
-  if (BASE_REGISTER_RTX_P (X))					  \
-    goto LABEL;							  \
-  else if (GET_CODE (X) == PLUS || GET_CODE (X) == LO_SUM) 	  \
-    {								  \
-      rtx xop0 = XEXP (X,0);					  \
-      rtx xop1 = XEXP (X,1);					  \
-      if (BASE_REGISTER_RTX_P (xop0))				  \
-	GO_IF_LEGITIMATE_INDEX (MODE, REGNO (xop0), xop1, LABEL); \
-      if (BASE_REGISTER_RTX_P (xop1))				  \
-	GO_IF_LEGITIMATE_INDEX (MODE, REGNO (xop1), xop0, LABEL); \
-    }								  \
-}
-
 /* Specify the machine mode that this machine uses
    for the index in the tablejump instruction.  */
 #define CASE_VECTOR_MODE SImode
@@ -611,23 +532,17 @@ extern const enum reg_class regno_reg_class[FIRST_PSEUDO_REGISTER];
 #define Pmode          SImode
 #define FUNCTION_MODE  HImode
 
-#define WORD_REGISTER_OPERATIONS
-
 /* Assembler output control.  */
-#define ASM_COMMENT_START "\t//"
+#define ASM_COMMENT_START "\t;"
 
-#define ASM_APP_ON	"// inline asm begin\n"
-#define ASM_APP_OFF	"// inline asm end\n"
+#define ASM_APP_ON	"; inline asm begin\n"
+#define ASM_APP_OFF	"; inline asm end\n"
 
 #define FILE_ASM_OP     "\t.file\n"
 
 /* Switch to the text or data segment.  */
 #define TEXT_SECTION_ASM_OP  "\t.text"
 #define DATA_SECTION_ASM_OP  "\t.data"
-
-/* Switch into a generic section.  */
-#undef  TARGET_ASM_NAMED_SECTION
-#define TARGET_ASM_NAMED_SECTION vc4_asm_named_section
 
 #define INCOMING_RETURN_ADDR_RTX gen_rtx_REG (SImode, LR_REG)
 
@@ -674,7 +589,7 @@ extern const enum reg_class regno_reg_class[FIRST_PSEUDO_REGISTER];
 #define SUPPORTS_ONE_ONLY 1
 
 /* Globalizing directive for a label.  */
-#define GLOBAL_ASM_OP "\t.export\t"
+#define GLOBAL_ASM_OP "\t.globl\t"
 
 /* The prefix to add to user-visible assembler symbols.  */
 #undef  USER_LABEL_PREFIX
