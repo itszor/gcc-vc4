@@ -223,14 +223,13 @@ enum {
    (((GET_MODE_SIZE (MODE) + UNITS_PER_WORD - 1) / UNITS_PER_WORD))
 
 /* Value is 1 if hard register REGNO can hold a value of machine-mode MODE. */
-#define HARD_REGNO_MODE_OK(REGNO, MODE) 1
+#define HARD_REGNO_MODE_OK(REGNO, MODE) ((REGNO) < AP_REG)
 
 /* Value is 1 if it is a good idea to tie two pseudo registers
    when one has mode MODE1 and one has mode MODE2.
    If HARD_REGNO_MODE_OK could produce different values for MODE1 and MODE2,
    for any hard reg, then this must be 0 for correct output.  */
-#define MODES_TIEABLE_P(MODE1, MODE2) \
-  ((MODE1) == (MODE2) || GET_MODE_CLASS (MODE1) == GET_MODE_CLASS (MODE2))
+#define MODES_TIEABLE_P(MODE1, MODE2) 1
 
 /* Definitions for register eliminations.
 
@@ -240,8 +239,9 @@ enum {
    eliminated; it is replaced with either the stack or frame pointer.  */
 
 
-/* Register in which the static-chain is passed to a function.  */
-#define STATIC_CHAIN_REGNUM	R0_REG
+/* Register in which the static-chain is passed to a function.
+   FIXME: Chosen at random.  */
+#define STATIC_CHAIN_REGNUM	R23_REG
 
 /* This is an array of structures.  Each structure initializes one pair
    of eliminable registers.  The "from" register number is given first,
@@ -257,7 +257,7 @@ enum {
 /* Define the offset between two registers, one to be eliminated, and the other
    its replacement, at the start of a routine.  */
 #define INITIAL_ELIMINATION_OFFSET(FROM, TO, OFFSET) \
-  OFFSET = vc4_initial_elimination_offset (FROM, TO)
+  (OFFSET) = vc4_initial_elimination_offset (FROM, TO)
 
 /* Define the classes of registers for register constraints in the
    machine description.  Also define ranges of constants.
@@ -290,6 +290,9 @@ enum reg_class {
     NO_REGS,
     FAST_REGS,
     GENERAL_REGS,
+    AFP_REG,
+    SFP_REG,
+    CC_REGS,
     ALL_REGS,
 
     LIM_REG_CLASSES,
@@ -298,24 +301,30 @@ enum reg_class {
 
 
 /* Give names of register classes as strings for dump file.  */
-#define REG_CLASS_NAMES \
-{ \
-  "NO_REGS", \
-  "FAST_REGS", \
-  "GENERAL_REGS", \
-  "ALL_REGS", \
+#define REG_CLASS_NAMES		\
+{				\
+  "NO_REGS",			\
+  "FAST_REGS",			\
+  "GENERAL_REGS",		\
+  "AFP_REG",			\
+  "SFP_REG",			\
+  "CC_REGS",			\
+  "ALL_REGS",			\
 }
 
 /* Define which registers fit in which classes.
    This is an initializer for a vector of HARD_REG_SET
    of length N_REG_CLASSES.  */
 
-#define REG_CLASS_CONTENTS \
-{ \
-  {0x00000000},  /* NO_REGS */ \
-  {0x0000ffff},  /* FAST_REGS */ \
-  {0x1fffffff},  /* GENERAL_REGS */ \
-  {0x3fffffff}   /* ALL_REGS */ \
+#define REG_CLASS_CONTENTS		\
+{					\
+  { 0x00000000 },  /* NO_REGS */	\
+  { 0x0000ffff },  /* FAST_REGS */	\
+  { 0x07ffffff },  /* GENERAL_REGS */	\
+  { 0x08000000 },  /* AFP_REG */	\
+  { 0x10000000 },  /* SFP_REG */	\
+  { 0x20000000 },  /* CC_REGS */	\
+  { 0x27ffffff }   /* ALL_REGS */	\
 }
 
 /* The same information, inverted:
@@ -323,36 +332,13 @@ enum reg_class {
    reg number REGNO.  This could be a conditional expression
    or could index an array.  */
 
-extern const enum reg_class regno_reg_class[FIRST_PSEUDO_REGISTER];
-#define REGNO_REG_CLASS(REGNO) ((REGNO) < FIRST_PSEUDO_REGISTER ? regno_reg_class[REGNO] : NO_REGS)
-
-/* When this hook returns true for MODE, the compiler allows
-   registers explicitly used in the rtl to be used as spill registers
-   but prevents the compiler from extending the lifetime of these
-   registers.  */
-#define TARGET_SMALL_REGISTER_CLASSES_FOR_MODE_P hook_bool_mode_true
+extern const enum reg_class vc4_regno_reg_class[FIRST_PSEUDO_REGISTER];
+#define REGNO_REG_CLASS(REGNO) \
+  ((REGNO) < FIRST_PSEUDO_REGISTER ? vc4_regno_reg_class[REGNO] : NO_REGS)
 
 /* The class value for index registers, and the one for base regs.  */
-#define INDEX_REG_CLASS  GENERAL_REGS
+#define INDEX_REG_CLASS  NO_REGS
 #define BASE_REG_CLASS	 GENERAL_REGS
-
-/* Convenience wrappers around insn_const_int_ok_for_constraint.  */
-#define CONST_OK_FOR_I(VALUE) \
-  insn_const_int_ok_for_constraint (VALUE, CONSTRAINT_I)
-#define CONST_OK_FOR_J(VALUE) \
-  insn_const_int_ok_for_constraint (VALUE, CONSTRAINT_J)
-#define CONST_OK_FOR_L(VALUE) \
-  insn_const_int_ok_for_constraint (VALUE, CONSTRAINT_L)
-#define CONST_OK_FOR_K(VALUE) \
-  insn_const_int_ok_for_constraint (VALUE, CONSTRAINT_K)
-#define CONST_OK_FOR_M(VALUE) \
-  insn_const_int_ok_for_constraint (VALUE, CONSTRAINT_M)
-#define CONST_OK_FOR_N(VALUE) \
-  insn_const_int_ok_for_constraint (VALUE, CONSTRAINT_N)
-#define CONST_OK_FOR_O(VALUE) \
-  insn_const_int_ok_for_constraint (VALUE, CONSTRAINT_O)
-#define CONST_OK_FOR_P(VALUE) \
-  insn_const_int_ok_for_constraint (VALUE, CONSTRAINT_P)
 
 /* Return the maximum number of consecutive registers
    needed to represent mode MODE in a register of class CLASS. 
@@ -421,11 +407,6 @@ extern const enum reg_class regno_reg_class[FIRST_PSEUDO_REGISTER];
 
 #define ROUND_ADVANCE(SIZE)	\
   ((SIZE + UNITS_PER_WORD - 1) / UNITS_PER_WORD)
-
-/* Round a register number up to a proper boundary for an arg of mode 
-   MODE. None needed on the VC4. */
-   
-#define ROUND_REG(REG, MODE) REG
 
 /* We have postincrement and predecrement, and want to use them. */
 
@@ -583,6 +564,11 @@ extern const enum reg_class regno_reg_class[FIRST_PSEUDO_REGISTER];
 #ifndef ASM_DECLARE_RESULT
 #define ASM_DECLARE_RESULT(FILE, RESULT)
 #endif
+
+#define ASM_FPRINTF_EXTENSIONS(FILE, ARGS, P)			\
+  case 'r':							\
+    fprintf (FILE, "%s", reg_names [va_arg (ARGS, int)]);	\
+    break;
 
 #define MULTIPLE_SYMBOL_SPACES 1
 

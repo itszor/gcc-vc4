@@ -17,18 +17,20 @@
 ;; along with GCC; see the file COPYING3.  If not see
 ;; <http://www.gnu.org/licenses/>.
 
-;; Nonzero if OP is a fast register.
+(define_special_predicate "vc4_push_multiple"
+  (match_code "parallel")
+{
+  return vc4_push_pop_operation_p (op, true, false);
+})
 
-(define_predicate "fast_register"
-  (match_code "reg,subreg")
-  {
-    if (!register_operand(op, mode))
-      return 0;
+(define_special_predicate "vc4_pop_multiple"
+  (match_code "parallel")
+{
+  return vc4_push_pop_operation_p (op, false, false);
+})
 
-    if (GET_CODE(op) != REG)
-      return 0;
-
-    return (REGNO_REG_CLASS(REGNO(op)) == FAST_REGS);
-  }
-)
-
+(define_special_predicate "vc4_pop_multiple_return"
+  (match_code "parallel")
+{
+  return vc4_push_pop_operation_p (op, false, true);
+})

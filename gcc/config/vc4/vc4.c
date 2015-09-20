@@ -54,16 +54,17 @@
  * Provides the class number of the smallest class containing reg number.
  * 
  */
-const enum reg_class regno_reg_class[FIRST_PSEUDO_REGISTER] =
+const enum reg_class
+vc4_regno_reg_class[FIRST_PSEUDO_REGISTER] =
 {
-    FAST_REGS, FAST_REGS, FAST_REGS, FAST_REGS, /* 00-03 */
-    FAST_REGS, FAST_REGS, FAST_REGS, FAST_REGS, /* 04-07 */
-    FAST_REGS, FAST_REGS, FAST_REGS, FAST_REGS, /* 08-11 */
-    FAST_REGS, FAST_REGS, FAST_REGS, FAST_REGS, /* 12-15 */
-    GENERAL_REGS, GENERAL_REGS, GENERAL_REGS, GENERAL_REGS,     /* 16-19 */
-    GENERAL_REGS, GENERAL_REGS, GENERAL_REGS, GENERAL_REGS,     /* 20-23 */
-    GENERAL_REGS, GENERAL_REGS, GENERAL_REGS,   /* gp, sp, lr */
-    ALL_REGS, ALL_REGS, ALL_REGS        /* ?ap, ?fp, ?cc */
+  FAST_REGS, FAST_REGS, FAST_REGS, FAST_REGS, /* 00-03 */
+  FAST_REGS, FAST_REGS, FAST_REGS, FAST_REGS, /* 04-07 */
+  FAST_REGS, FAST_REGS, FAST_REGS, FAST_REGS, /* 08-11 */
+  FAST_REGS, FAST_REGS, FAST_REGS, FAST_REGS, /* 12-15 */
+  GENERAL_REGS, GENERAL_REGS, GENERAL_REGS, GENERAL_REGS,     /* 16-19 */
+  GENERAL_REGS, GENERAL_REGS, GENERAL_REGS, GENERAL_REGS,     /* 20-23 */
+  GENERAL_REGS, GENERAL_REGS, GENERAL_REGS,   /* gp, sp, lr */
+  AFP_REG, SFP_REG, CC_REGS			/* ?ap, ?fp, ?cc */
 };
 
 /*
@@ -102,7 +103,6 @@ static struct machine_function *vc4_init_machine_status(void)
 
 static void vc4_compute_frame(void);
 static tree vc4_handle_naked_attribute(tree *, tree, tree, int, bool *);
-static int num_arg_regs(enum machine_mode mode, const_tree type);
 
 /*
  * VC4 specific attributes.  
@@ -160,33 +160,60 @@ vc4_target_address_cost (rtx address ATTRIBUTE_UNUSED,
   return 0;
 }
 
+static void
+vc4_print_operand_address (FILE *stream, rtx x)
+{
+  switch (GET_CODE (x))
+    {
+    case REG:
+      asm_fprintf (stream, "(%r)", REGNO (x));
+      break;
+
+    case PLUS:
+      if (REG_P (XEXP (x, 0))
+	  && GET_CODE (XEXP (x, 1)) == CONST_INT)
+	asm_fprintf (stream, "%d(%r)", (int) INTVAL (XEXP (x, 1)),
+		     REGNO (XEXP (x, 0)));
+      else if (REG_P (XEXP (x, 0)) && REG_P (XEXP (x, 1)))
+        asm_fprintf (stream, "(%r, %r)", REGNO (XEXP (x, 0)),
+		     REGNO (XEXP (x, 1)));
+      else
+        output_operand_lossage ("invalid PLUS operand");
+      break;
+
+    default:
+      output_addr_const (stream, x);
+    }
+}
+
 /*
  * Print operand x (an rtx) in assembler syntax to file stream according
  * to modifier code.
  */
 
-static void vc4_print_operand(FILE * stream, rtx x, int code)
+static void
+vc4_print_operand (FILE *stream, rtx x, int code)
 {
-    switch (code)
+  switch (code)
     {
-        case 'C':
-            fprintf(asm_out_file, "#" HOST_WIDE_INT_PRINT_DEC, INTVAL(x));
-            break;
+      case 'C':
+        fprintf (asm_out_file, "#" HOST_WIDE_INT_PRINT_DEC, INTVAL (x));
+        break;
 
-        default:
-            switch (GET_CODE(x))
-            {
-                case REG:
-                    fputs(reg_names[REGNO(x)], (stream));
-                    break;
-                case MEM:
-                    output_address(XEXP(x, 0));
-                    break;
-                default:
-                    output_addr_const(stream, x);
-                    break;
-            }
+      default:
+        switch (GET_CODE (x))
+          {
+          case REG:
+            asm_fprintf (stream, "%r", REGNO (x));
             break;
+          case MEM:
+            vc4_print_operand_address (stream, XEXP (x, 0));
+            break;
+          default:
+            output_addr_const (stream, x);
+            break;
+          }
+        break;
     }
 }
 
@@ -310,8 +337,38 @@ static int register_offset(int reg)
 
 int vc4_initial_elimination_offset(int from, int to)
 {
-    vc4_compute_frame();
-	return register_offset(to) - register_offset(from);
+  vc4_compute_frame();
+
+  return register_offset(to) - register_offset(from);
+}
+
+bool
+vc4_can_eliminate (const int from, const int to)
+{
+  if ((from == ARG_POINTER_REGNUM && to == FRAME_POINTER_REGNUM)
+      || (frame_pointer_needed && to == STACK_POINTER_REGNUM))
+    return false;
+
+  return true;
+}
+
+/* Compute the number of word sized registers needed to hold a function
+   argument of mode MODE and type TYPE.  */
+
+static int
+num_arg_regs (enum machine_mode mode, const_tree type)
+{
+  int size;
+
+  if (targetm.calls.must_pass_in_stack (mode, type))
+    return 0;
+
+  if (type && mode == BLKmode)
+    size = int_size_in_bytes (type);
+  else
+    size = GET_MODE_SIZE (mode);
+
+  return ROUND_ADVANCE (size);
 }
 
 /*
@@ -394,8 +451,10 @@ static void
 vc4_target_asm_function_prologue (FILE *file,
 				  HOST_WIDE_INT size ATTRIBUTE_UNUSED)
 {
+#if 0
   int sp_adjust;
   bool pushlr;
+#endif
 
   vc4_compute_frame ();
 
@@ -408,6 +467,7 @@ vc4_target_asm_function_prologue (FILE *file,
   fprintf (file, "\t; topreg = %d\n", cfun->machine->topreg);
   fprintf (file, "\t; lr needs saving = %d\n", cfun->machine->lrneedssaving);
 
+#if 0
   pushlr = cfun->machine->lrneedssaving;
 
   /* Save callee-saved registers. */
@@ -455,12 +515,14 @@ vc4_target_asm_function_prologue (FILE *file,
 
       output_asm_insn("add %0, %1, #%2", ops);
     }
+#endif
 }
 
 static void
 vc4_target_asm_function_epilogue (FILE *file ATTRIBUTE_UNUSED,
 				  HOST_WIDE_INT size ATTRIBUTE_UNUSED)
 {
+#if 0
 	bool pushlr;
 	int sp_adjust;
 
@@ -499,6 +561,357 @@ vc4_target_asm_function_epilogue (FILE *file ATTRIBUTE_UNUSED,
 
 	if (!pushlr)
 		output_asm_insn("rts", NULL);
+#endif
+}
+
+bool
+vc4_push_pop_operation_p (rtx op, bool is_push, bool returns)
+{
+  unsigned int par_len = XVECLEN (op, 0), i;
+  rtx base_reg = NULL_RTX;
+  bool have_return = false;
+
+  for (i = 0; i < par_len; i++)
+    {
+      rtx set = XVECEXP (op, 0, i), reg, mem;
+      
+      if (!is_push && GET_CODE (set) == RETURN)
+        {
+          have_return = true;
+	  continue;
+	}
+
+      if (GET_CODE (set) != SET)
+        return false;
+
+      if (is_push)
+        {
+	  reg = SET_SRC (set);
+	  mem = SET_DEST (set);
+	}
+      else
+        {
+	  reg = SET_DEST (set);
+	  mem = SET_SRC (set);
+	}
+
+      if (GET_CODE (SET_SRC (set)) == PLUS && REG_P (SET_DEST (set)))
+        base_reg = SET_DEST (set);
+      else if (MEM_P (mem) && (REG_P (reg) || rtx_equal_p (reg, pc_rtx)))
+	;
+      else
+        return false;
+    }
+
+  if (base_reg == NULL_RTX)
+    return false;
+
+  if (have_return != returns)
+    return false;
+
+  return true;
+}
+
+const char *
+vc4_emit_multi_reg_push (rtx par)
+{
+  unsigned int par_len = XVECLEN (par, 0), i;
+  int base_reg = -1, lo_reg = -1, hi_reg = -1;
+  bool lr_included = false;
+  rtx operands[2];
+  
+  for (i = 0; i < par_len; i++)
+    {
+      rtx set = XVECEXP (par, 0, i);
+
+      gcc_assert (GET_CODE (set) == SET);
+
+      if (GET_CODE (SET_SRC (set)) == PLUS && REG_P (SET_DEST (set)))
+	base_reg = REGNO (SET_DEST (set));
+      else if (MEM_P (SET_DEST (set)) && REG_P (SET_SRC (set)))
+	{
+	  int pushed_reg = REGNO (SET_SRC (set));
+
+	  if (pushed_reg == LR_REG)
+	    lr_included = true;
+	  else if (lo_reg == -1 || hi_reg == -1)
+	    lo_reg = hi_reg = pushed_reg;
+	  else
+	    {
+	      if (pushed_reg > hi_reg)
+		hi_reg = pushed_reg;
+	      if (pushed_reg < lo_reg)
+	        lo_reg = pushed_reg;
+	    }
+	}
+      else
+	gcc_unreachable ();
+    }
+
+  gcc_assert (base_reg == SP_REG);
+  gcc_assert (lo_reg == R0_REG || lo_reg == R6_REG || lo_reg == R16_REG
+	      || lo_reg == GP_REG
+	      || (lo_reg == -1 && hi_reg == -1 && lr_included));
+  gcc_assert (hi_reg >= lo_reg
+	      || (lo_reg == -1 && hi_reg == -1 && lr_included));
+
+  if (lo_reg == hi_reg)
+    {
+      if (lo_reg == -1 && lr_included)
+	return "push lr";
+      else
+        {
+	  operands[0] = gen_rtx_REG (SImode, lo_reg);
+          output_asm_insn ("push %0, lr", operands);
+	  return "";
+	}
+    }
+  else
+    {
+      operands[0] = gen_rtx_REG (SImode, lo_reg);
+      operands[1] = gen_rtx_REG (SImode, hi_reg);
+      if (lr_included)
+        output_asm_insn ("push %0-%1, lr", operands);
+      else
+	output_asm_insn ("push %0-%1", operands);
+      return "";
+    }
+}
+
+const char *
+vc4_emit_multi_reg_pop (rtx par)
+{
+  unsigned int par_len = XVECLEN (par, 0), i;
+  int base_reg = -1, lo_reg = -1, hi_reg = -1;
+  bool pc_included = false, have_return = false;
+  rtx operands[2];
+  
+  for (i = 0; i < par_len; i++)
+    {
+      if (GET_CODE (XVECEXP (par, 0, i)) == RETURN)
+        {
+	  have_return = true;
+          continue;
+	}
+
+      rtx set = XVECEXP (par, 0, i);
+
+      gcc_assert (GET_CODE (set) == SET);
+
+      if (GET_CODE (SET_SRC (set)) == PLUS && REG_P (SET_DEST (set)))
+	base_reg = REGNO (SET_DEST (set));
+      else if ((REG_P (SET_DEST (set)) || rtx_equal_p (SET_DEST (set), pc_rtx))
+	       && MEM_P (SET_SRC (set)))
+	{
+	  int popped_reg = REGNO (SET_DEST (set));
+
+	  if (SET_DEST (set) == pc_rtx)
+	    pc_included = true;
+	  else if (lo_reg == -1 || hi_reg == -1)
+	    lo_reg = hi_reg = popped_reg;
+	  else
+	    {
+	      if (popped_reg > hi_reg)
+		hi_reg = popped_reg;
+	      if (popped_reg < lo_reg)
+	        lo_reg = popped_reg;
+	    }
+	}
+      else
+	gcc_unreachable ();
+    }
+
+  gcc_assert (have_return == pc_included);
+  gcc_assert (base_reg == SP_REG);
+  gcc_assert (lo_reg == R0_REG || lo_reg == R6_REG || lo_reg == R16_REG
+	      || lo_reg == GP_REG
+	      || (lo_reg == -1 && hi_reg == -1 && pc_included));
+  gcc_assert (hi_reg >= lo_reg
+	      || (lo_reg == -1 && hi_reg == -1 && pc_included));
+
+  if (lo_reg == hi_reg)
+    {
+      if (lo_reg == -1 && pc_included)
+	return "pop pc";
+      else
+        {
+	  operands[0] = gen_rtx_REG (SImode, lo_reg);
+          output_asm_insn ("pop %0, pc", operands);
+	  return "";
+	}
+    }
+  else
+    {
+      operands[0] = gen_rtx_REG (SImode, lo_reg);
+      operands[1] = gen_rtx_REG (SImode, hi_reg);
+      if (pc_included)
+        output_asm_insn ("pop %0-%1, pc", operands);
+      else
+	output_asm_insn ("pop %0-%1", operands);
+      return "";
+    }
+}
+
+static rtx
+vc4_emit_push (int lo_reg, int hi_reg, bool include_lr)
+{
+  int regs_to_push, i;
+  rtx sp = gen_rtx_REG (SImode, SP_REG);
+  
+  if (lo_reg == -1 && hi_reg == -1)
+    regs_to_push = 0;
+  else
+    regs_to_push = 1 + hi_reg - lo_reg;
+  
+  regs_to_push += (include_lr ? 1 : 0);
+
+  gcc_assert (regs_to_push > 0);
+
+  rtx par = gen_rtx_PARALLEL (VOIDmode, rtvec_alloc (regs_to_push + 1));
+
+  XVECEXP (par, 0, 0)
+    = gen_rtx_SET (VOIDmode, sp,
+		   gen_rtx_PLUS (SImode, sp,
+				 GEN_INT (-regs_to_push * UNITS_PER_WORD)));
+
+  for (i = 0; i < regs_to_push; i++)
+    {
+      int regno = i + lo_reg;
+
+      if (include_lr && i == regs_to_push - 1)
+        regno = LR_REG;
+
+      XVECEXP (par, 0, i + 1)
+        = gen_rtx_SET (VOIDmode,
+		       gen_rtx_MEM (SImode,
+			 gen_rtx_PLUS (SImode, sp,
+			   GEN_INT ((i - regs_to_push) * UNITS_PER_WORD))),
+		       gen_rtx_REG (SImode, regno));
+    }
+
+  return emit_insn (par);
+}
+
+static void
+vc4_emit_pop (int lo_reg, int hi_reg, bool include_pc)
+{
+  int regs_to_pop, i;
+  rtx sp = gen_rtx_REG (SImode, SP_REG);
+  int vecidx;
+  
+  if (lo_reg == -1 && hi_reg == -1)
+    regs_to_pop = 0;
+  else
+    regs_to_pop = 1 + hi_reg - lo_reg;
+  
+  regs_to_pop += (include_pc ? 1 : 0);
+
+  gcc_assert (regs_to_pop > 0);
+
+  rtx par = gen_rtx_PARALLEL (VOIDmode, rtvec_alloc (regs_to_pop + 1
+						     + (include_pc ? 1 : 0)));
+
+  if (include_pc)
+    XVECEXP (par, 0, vecidx++) = gen_vc4_return ();
+
+  XVECEXP (par, 0, vecidx++)
+    = gen_rtx_SET (VOIDmode, sp,
+		   gen_rtx_PLUS (SImode, sp,
+				 GEN_INT (regs_to_pop * UNITS_PER_WORD)));
+
+  for (i = 0; i < regs_to_pop; i++)
+    {
+      rtx dst;
+
+      if (include_pc && i == regs_to_pop - 1)
+        dst = pc_rtx;
+      else
+        dst = gen_rtx_REG (SImode, i + lo_reg);
+
+      XVECEXP (par, 0, vecidx++)
+        = gen_rtx_SET (VOIDmode,
+		       dst,
+		       gen_rtx_MEM (SImode,
+			 gen_rtx_PLUS (SImode, sp,
+			   GEN_INT (i * UNITS_PER_WORD))));
+    }
+
+  if (include_pc)
+    emit_jump_insn (par);
+  else
+    emit_insn (par);
+}
+
+
+void
+vc4_expand_prologue (void)
+{
+  int sp_adjust;
+  bool pushlr;
+  rtx sp = gen_rtx_REG (Pmode, STACK_POINTER_REGNUM);
+  rtx fp = gen_rtx_REG (Pmode, HARD_FRAME_POINTER_REGNUM);
+  rtx insn;
+
+  vc4_compute_frame ();
+  
+  pushlr = cfun->machine->lrneedssaving;
+  
+  if (cfun->machine->topreg > 0)
+    insn = vc4_emit_push (R6_REG, cfun->machine->topreg, true);
+  else
+    insn = vc4_emit_push (-1, -1, true);
+  
+  RTX_FRAME_RELATED_P (insn) = 1;
+  
+  sp_adjust = cfun->machine->local_vars + cfun->machine->local_vars_padding
+	      + crtl->outgoing_args_size;
+
+  if (sp_adjust > 0)
+    {
+      insn = gen_addsi3 (sp, sp, GEN_INT (-sp_adjust));
+      RTX_FRAME_RELATED_P (insn) = 1;
+      emit_insn (insn);
+    }
+  
+  if (frame_pointer_needed)
+    {
+      insn = gen_addsi3 (fp, sp, GEN_INT (crtl->outgoing_args_size));
+      RTX_FRAME_RELATED_P (insn) = 1;
+      emit_insn (insn);
+    }
+}
+
+void
+vc4_expand_epilogue (void)
+{
+  int sp_adjust;
+  bool pushlr;
+  rtx sp = gen_rtx_REG (Pmode, STACK_POINTER_REGNUM);
+  rtx fp = gen_rtx_REG (Pmode, HARD_FRAME_POINTER_REGNUM);
+
+  emit_insn (gen_blockage ());
+
+  vc4_compute_frame ();
+  
+  pushlr = cfun->machine->lrneedssaving;
+  
+  sp_adjust = cfun->machine->local_vars + cfun->machine->local_vars_padding
+	      + crtl->outgoing_args_size;
+
+  if (frame_pointer_needed)
+    gen_addsi3 (sp, fp, GEN_INT (cfun->machine->local_vars
+				 + cfun->machine->local_vars_padding));
+  else if (sp_adjust > 0)
+    gen_addsi3 (sp, sp, GEN_INT (sp_adjust));
+  
+  if (cfun->machine->topreg > 0)
+    vc4_emit_pop (R6_REG, cfun->machine->topreg, true);
+  else if (pushlr)
+    vc4_emit_pop (-1, -1, true);
+  else
+    emit_jump_insn (simple_return_rtx);
+
+  emit_use (sp);
 }
 
 static void
@@ -510,95 +923,19 @@ vc4_option_override(void)
     init_machine_status = vc4_init_machine_status;
 }
 
-/*
- * Compute the number of word sized registers needed to hold a function
- * argument of mode MODE and type TYPE.  
- */
-
-static int
-num_arg_regs(enum machine_mode mode, const_tree type)
-{
-    int size;
-
-    if (targetm.calls.must_pass_in_stack(mode, type))
-        return 0;
-
-    if (type && mode == BLKmode)
-        size = int_size_in_bytes(type);
-    else
-        size = GET_MODE_SIZE(mode);
-
-    return ROUND_ADVANCE(size);
-}
-
-static rtx
-handle_structs_in_regs(enum machine_mode mode, const_tree type, int reg)
-{
-    int size;
-
-    /*
-     * We define that a structure whose size is not a whole
-     * multiple of bytes is passed packed into registers (or spilled onto
-     * the stack if not enough registers are available) with the last few
-     * bytes of the structure being packed, left-justified, into the last
-     * register/stack slot. GCC handles this correctly if the last word is 
-     * in a stack slot, but we have to generate a special, PARALLEL RTX if 
-     * the last word is in an argument register.  
-     */
-    if (type
-        && TYPE_MODE(type) == BLKmode
-        && TREE_CODE(TYPE_SIZE(type)) == INTEGER_CST
-        && (size = int_size_in_bytes(type)) > UNITS_PER_WORD
-        && (size % UNITS_PER_WORD != 0)
-        && (reg + num_arg_regs(mode, type) <=
-            (FIRST_PARM_REG + NPARM_REGS)))
-    {
-        rtx arg_regs[NPARM_REGS];
-        int nregs;
-        rtx result;
-        rtvec rtvec;
-
-        for (nregs = 0; size > 0; size -= UNITS_PER_WORD)
-        {
-            arg_regs[nregs] =
-                gen_rtx_EXPR_LIST(SImode,
-                                  gen_rtx_REG(SImode, reg++),
-                                  GEN_INT(nregs * UNITS_PER_WORD));
-            nregs++;
-        }
-
-        /*
-         * We assume here that NPARM_REGS == 6.  The assert checks this.  
-         */
-        gcc_assert(ARRAY_SIZE(arg_regs) == 6);
-        rtvec = gen_rtvec(nregs, arg_regs[0], arg_regs[1], arg_regs[2],
-                          arg_regs[3], arg_regs[4], arg_regs[5]);
-
-        result = gen_rtx_PARALLEL(mode, rtvec);
-        return result;
-    }
-
-    return gen_rtx_REG(mode, reg);
-}
 
 /* TARGET_FUNCTION_VALUE: return RTX that represents where a function
  * return goes. */
 
 rtx
-vc4_function_value (const_tree valtype, const_tree func,
+vc4_function_value (const_tree valtype, const_tree func ATTRIBUTE_UNUSED,
 		    bool outgoing ATTRIBUTE_UNUSED)
 {
-    enum machine_mode mode;
-    int unsigned_p;
+  enum machine_mode mode;
 
-    mode = TYPE_MODE(valtype);
+  mode = TYPE_MODE(valtype);
 
-    /*
-     * Since we promote return types, we must promote the mode here too.  
-     */
-    mode = promote_function_mode(valtype, mode, &unsigned_p, func, 1);
-
-    return handle_structs_in_regs(mode, valtype, FIRST_RET_REG);
+  return gen_rtx_REG (mode, FIRST_RET_REG);
 }
 
 /*
@@ -619,34 +956,32 @@ vc4_function_value (const_tree valtype, const_tree func,
  */
 
 static rtx
-vc4_function_arg(cumulative_args_t cum, enum machine_mode mode,
-                 const_tree type, bool named)
+vc4_function_arg (cumulative_args_t cum, enum machine_mode mode,
+		  const_tree type, bool named)
 {
-    int arg_reg;
+  int arg_reg;
 
-    if (!named || mode == VOIDmode)
-        return 0;
-
-    if (targetm.calls.must_pass_in_stack(mode, type))
-        return 0;
-
-    arg_reg = ROUND_REG(*get_cumulative_args(cum), mode);
-
-    if (arg_reg < NPARM_REGS)
-        return handle_structs_in_regs(mode, type,
-                                      FIRST_PARM_REG + arg_reg);
-
+  if (!named || mode == VOIDmode)
     return 0;
+
+  if (targetm.calls.must_pass_in_stack (mode, type))
+    return 0;
+
+  arg_reg = *get_cumulative_args (cum);
+
+  if (arg_reg + num_arg_regs (mode, type) < NPARM_REGS)
+    return gen_rtx_REG (mode, arg_reg + FIRST_PARM_REG);
+
+  return 0;
 }
 
 static void
-vc4_function_arg_advance(cumulative_args_t cum_v, enum machine_mode mode,
-                         const_tree type, bool named ATTRIBUTE_UNUSED)
+vc4_function_arg_advance (cumulative_args_t cum_v, enum machine_mode mode,
+			  const_tree type, bool named ATTRIBUTE_UNUSED)
 {
-    CUMULATIVE_ARGS *cum = get_cumulative_args(cum_v);
+  CUMULATIVE_ARGS *cum = get_cumulative_args (cum_v);
 
-    *cum = (ROUND_REG(*cum, mode)
-            + (int) named * num_arg_regs(mode, type));
+  (*cum) += (int) named * num_arg_regs (mode, type);
 }
 
 static unsigned int
@@ -673,7 +1008,7 @@ static int
 vc4_arg_partial_bytes(cumulative_args_t cum, enum machine_mode mode,
                       tree type, bool named)
 {
-    int reg = ROUND_REG(*get_cumulative_args(cum), mode);
+    int reg = *get_cumulative_args (cum);
 
     if (named == 0)
         return 0;
@@ -762,12 +1097,13 @@ vc4_address_register_p (rtx x, bool strict)
 	 && (REGNO (x) < AP_REG
 	     || (!strict
 		 && (REGNO (x) >= FIRST_PSEUDO_REGISTER
-		     || REGNO (x) == FRAME_POINTER_REGNUM
-		     || REGNO (x) == ARG_POINTER_REGNUM)));
+		     /*|| REGNO (x) == FRAME_POINTER_REGNUM
+		     || REGNO (x) == ARG_POINTER_REGNUM*/)));
 }
 
 static bool
-vc4_legitimate_address_p (enum machine_mode mode, rtx x, bool strict)
+vc4_legitimate_address_p (enum machine_mode mode ATTRIBUTE_UNUSED, rtx x,
+			  bool strict)
 {
   if (CONSTANT_ADDRESS_P (x))
     return true;
@@ -783,6 +1119,24 @@ vc4_legitimate_address_p (enum machine_mode mode, rtx x, bool strict)
     return true;
 
   /* !!! (reg, reg) addressing also appears to be available.  */
+
+  return false;
+}
+
+bool
+vc4_short_form_addr_p (enum machine_mode mode, rtx x, bool strict)
+{
+  if (vc4_address_register_p (x, strict))
+    return true;
+
+  if (GET_CODE (x) == PLUS
+      && vc4_address_register_p (XEXP (x, 0), strict)
+      && mode == SImode
+      && GET_CODE (XEXP (x, 1)) == CONST_INT
+      && INTVAL (XEXP (x, 1)) >= 0
+      && INTVAL (XEXP (x, 1)) < 64
+      && (INTVAL (XEXP (x, 1)) & 3) == 0)
+    return true;
 
   return false;
 }
@@ -809,6 +1163,9 @@ vc4_legitimate_constant_p(enum machine_mode mode ATTRIBUTE_UNUSED, rtx x)
 #define TARGET_ASM_UNALIGNED_SI_OP "\t.long\t"
 #endif
 
+#undef  TARGET_PRINT_OPERAND_ADDRESS
+#define TARGET_PRINT_OPERAND_ADDRESS	vc4_print_operand_address
+
 #undef  TARGET_PRINT_OPERAND
 #define TARGET_PRINT_OPERAND	        vc4_print_operand
 
@@ -828,8 +1185,8 @@ vc4_legitimate_constant_p(enum machine_mode mode ATTRIBUTE_UNUSED, rtx x)
 #define TARGET_MUST_PASS_IN_STACK	must_pass_in_stack_var_size
 #undef  TARGET_PASS_BY_REFERENCE
 #define TARGET_PASS_BY_REFERENCE  hook_pass_by_reference_must_pass_in_stack
-#undef  TARGET_ARG_PARTIAL_BYTES
-#define TARGET_ARG_PARTIAL_BYTES	vc4_arg_partial_bytes
+/*#undef  TARGET_ARG_PARTIAL_BYTES
+#define TARGET_ARG_PARTIAL_BYTES	vc4_arg_partial_bytes*/
 #undef  TARGET_FUNCTION_ARG
 #define TARGET_FUNCTION_ARG		vc4_function_arg
 #undef  TARGET_FUNCTION_ARG_ADVANCE
@@ -839,6 +1196,9 @@ vc4_legitimate_constant_p(enum machine_mode mode ATTRIBUTE_UNUSED, rtx x)
 
 #undef  TARGET_FUNCTION_VALUE
 #define TARGET_FUNCTION_VALUE           vc4_function_value
+
+#undef TARGET_CAN_ELIMINATE
+#define TARGET_CAN_ELIMINATE		vc4_can_eliminate
 
 #undef  TARGET_SETUP_INCOMING_VARARGS
 #define TARGET_SETUP_INCOMING_VARARGS	vc4_setup_incoming_varargs

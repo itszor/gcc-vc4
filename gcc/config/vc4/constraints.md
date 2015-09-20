@@ -42,10 +42,13 @@
   (and (match_code "const_int")
        (match_test "IN_RANGE (ival, -1024, 1023)")))
 
-(define_constraint "M"
-  "An unsigned integer in the range 0 to 60, used by the short-form memory
-   ops."
-  (and (match_code "const_int")
-       (match_test "IN_RANGE (ival, 0, 60)")))
+;(define_constraint "M"
+;  "An unsigned integer in the range 0 to 60, used by the short-form memory
+;   ops."
+;  (and (match_code "const_int")
+;       (match_test "IN_RANGE (ival, 0, 60)")))
 
-
+(define_memory_constraint "Us"
+  "A memory operand suitable for short-form memory ops."
+  (and (match_code "mem")
+       (match_test "vc4_short_form_addr_p (mode, XEXP (op, 0), false)")))
