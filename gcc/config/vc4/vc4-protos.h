@@ -21,5 +21,16 @@
  * <http://www.gnu.org/licenses/>.
  */
 
+#ifndef VC4_PROTOS_H
+#define VC4_PROTOS_H 1
+
 extern int vc4_initial_elimination_offset(int, int);
 
+extern bool vc4_short_form_addr_p (enum machine_mode, rtx, bool);
+extern bool vc4_push_pop_operation_p (rtx op, bool is_push, bool returns);
+extern const char *vc4_emit_multi_reg_push (rtx par);
+extern const char *vc4_emit_multi_reg_pop (rtx par);
+extern void vc4_expand_prologue (void);
+extern void vc4_expand_epilogue (void);
+
+#endif
