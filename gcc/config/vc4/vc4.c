@@ -23,28 +23,60 @@
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
-#include "tm.h"
-#include "rtl.h"
+#include "backend.h"
+#include "cfghooks.h"
 #include "tree.h"
-#include "tm_p.h"
-#include "vc4.h"
+#include "rtl.h"
+#include "df.h"
+#include "alias.h"
+#include "fold-const.h"
+#include "stringpool.h"
+#include "stor-layout.h"
+#include "calls.h"
+#include "varasm.h"
 #include "regs.h"
-#include "hard-reg-set.h"
 #include "insn-config.h"
 #include "conditions.h"
 #include "output.h"
 #include "insn-attr.h"
 #include "flags.h"
-#include "obstack.h"
-#include "expr.h"
 #include "reload.h"
-#include "recog.h"
-#include "function.h"
-#include "ggc.h"
+#include "expmed.h"
+#include "dojump.h"
+#include "explow.h"
+#include "emit-rtl.h"
+#include "stmt.h"
+#include "expr.h"
+#include "insn-codes.h"
+#include "optabs.h"
 #include "diagnostic-core.h"
+#include "recog.h"
+#include "cfgrtl.h"
+#include "cfganal.h"
+#include "lcm.h"
+#include "cfgbuild.h"
+#include "cfgcleanup.h"
+#include "cgraph.h"
+#include "except.h"
+#include "tm_p.h"
 #include "target.h"
+#include "sched-int.h"
+#include "common/common-target.h"
+#include "debug.h"
+#include "langhooks.h"
+#include "intl.h"
+#include "libfuncs.h"
+#include "params.h"
+#include "opts.h"
+#include "dumpfile.h"
+#include "gimple-expr.h"
+#include "target-globals.h"
+#include "builtins.h"
+#include "tm-constrs.h"
+#include "rtl-iter.h"
+
+/* This file should be included last.  */
 #include "target-def.h"
-#include "df.h"
 
 /*
  * Global variables for machine-dependent things.  
@@ -61,9 +93,10 @@ vc4_regno_reg_class[FIRST_PSEUDO_REGISTER] =
   FAST_REGS, FAST_REGS, FAST_REGS, FAST_REGS, /* 04-07 */
   FAST_REGS, FAST_REGS, FAST_REGS, FAST_REGS, /* 08-11 */
   FAST_REGS, FAST_REGS, FAST_REGS, FAST_REGS, /* 12-15 */
-  GENERAL_REGS, GENERAL_REGS, GENERAL_REGS, GENERAL_REGS,     /* 16-19 */
-  GENERAL_REGS, GENERAL_REGS, GENERAL_REGS, GENERAL_REGS,     /* 20-23 */
-  GENERAL_REGS, GENERAL_REGS, GENERAL_REGS,   /* gp, sp, lr */
+  GENERAL_REGS, GENERAL_REGS, GENERAL_REGS, GENERAL_REGS, /* 16-19 */
+  GENERAL_REGS, GENERAL_REGS, GENERAL_REGS, GENERAL_REGS, /* 20-23 */
+  GENERAL_REGS, GENERAL_REGS, GENERAL_REGS, SPECIAL_REGS, /* gp, sp, lr, 27 */
+  SPECIAL_REGS, SPECIAL_REGS, SPECIAL_REGS, SPECIAL_REGS, /* 28-31 */
   AFP_REG, SFP_REG, CC_REGS			/* ?ap, ?fp, ?cc */
 };
 
@@ -97,9 +130,12 @@ struct GTY (()) machine_function {
 
 /* Zero initialization is OK for all current fields.  */
 
-static struct machine_function *vc4_init_machine_status(void)
+static struct machine_function *
+vc4_init_machine_status (void)
 {
-  return ggc_alloc_cleared_machine_function();
+  struct machine_function *machine;
+  machine = ggc_cleared_alloc<machine_function> ();
+  return machine;
 }
 
 static struct machine_function *vc4_compute_frame(void);
@@ -125,7 +161,7 @@ static const struct attribute_spec vc4_attribute_table[] = {
  * Fast registers are cheap, everything else is expensive. 
  */
 static int
-vc4_target_register_move_cost (enum machine_mode mode ATTRIBUTE_UNUSED,
+vc4_target_register_move_cost (machine_mode mode ATTRIBUTE_UNUSED,
 			       reg_class_t from, reg_class_t to)
 {
   if ((from == FAST_REGS) && (to == from))
@@ -139,7 +175,7 @@ vc4_target_register_move_cost (enum machine_mode mode ATTRIBUTE_UNUSED,
  * indirections. Slow registers are slow. 
  */
 static int
-vc4_target_memory_move_cost (enum machine_mode mode ATTRIBUTE_UNUSED,
+vc4_target_memory_move_cost (machine_mode mode ATTRIBUTE_UNUSED,
 			     reg_class_t rclass, bool in ATTRIBUTE_UNUSED)
 {
   if (rclass == FAST_REGS)
@@ -154,7 +190,7 @@ vc4_target_memory_move_cost (enum machine_mode mode ATTRIBUTE_UNUSED,
  */
 static int
 vc4_target_address_cost (rtx address ATTRIBUTE_UNUSED,
-			 enum machine_mode mode ATTRIBUTE_UNUSED,
+			 machine_mode mode ATTRIBUTE_UNUSED,
                          addr_space_t as ATTRIBUTE_UNUSED,
 			 bool speed ATTRIBUTE_UNUSED)
 {
@@ -219,14 +255,13 @@ vc4_print_operand (FILE *stream, rtx x, int code)
 }
 
 static bool
-vc4_target_rtx_costs (rtx x, int code, int outer_code ATTRIBUTE_UNUSED,
+vc4_target_rtx_costs (rtx x, machine_mode mode, int outer_code ATTRIBUTE_UNUSED,
 		      int opno ATTRIBUTE_UNUSED, int *total,
 		      bool speed ATTRIBUTE_UNUSED)
 {
-  enum machine_mode mode = GET_MODE (x);
   bool value = false;
 
-  switch (code)
+  switch (GET_CODE (x))
     {
       case MEM:
 	{
@@ -282,6 +317,8 @@ vc4_target_rtx_costs (rtx x, int code, int outer_code ATTRIBUTE_UNUSED,
       case FIX:
         *total = COSTS_N_INSNS(100);
         value = true;
+        break;
+      default:
         break;
     }
 
@@ -340,10 +377,10 @@ vc4_initial_elimination_offset (int from, int to)
   struct machine_function *offsets = vc4_compute_frame ();
   int diff;
 
-  diff = register_offset (offsets, from) - register_offset (offsets, to);
+  diff = register_offset (offsets, to) - register_offset (offsets, from);
 
-  fprintf (stderr, "eliminating %s to %s: diff = %d\n", reg_names[from],
-	   reg_names[to], diff);
+  /*fprintf (stderr, "eliminating %s to %s: diff = %d\n", reg_names[from],
+	   reg_names[to], diff);*/
 
   return diff;
 }
@@ -362,7 +399,7 @@ vc4_can_eliminate (const int from, const int to)
    argument of mode MODE and type TYPE.  */
 
 static int
-num_arg_regs (enum machine_mode mode, const_tree type)
+num_arg_regs (machine_mode mode, const_tree type)
 {
   int size;
 
@@ -383,7 +420,7 @@ num_arg_regs (enum machine_mode mode, const_tree type)
 
 static void
 vc4_setup_incoming_varargs(cumulative_args_t args_so_far_v,
-                           enum machine_mode mode, tree type,
+                           machine_mode mode, tree type,
                            int *ptr_pretend_size ATTRIBUTE_UNUSED,
                            int second_time ATTRIBUTE_UNUSED)
 {
@@ -521,7 +558,7 @@ vc4_push_pop_operation_p (rtx op, bool is_push, bool returns)
 
       if (GET_CODE (SET_SRC (set)) == PLUS && REG_P (SET_DEST (set)))
         base_reg = SET_DEST (set);
-      else if (MEM_P (mem) && (REG_P (reg) || rtx_equal_p (reg, pc_rtx)))
+      else if (MEM_P (mem) && REG_P (reg))
 	;
       else
         return false;
@@ -627,12 +664,11 @@ vc4_emit_multi_reg_pop (rtx par)
 
       if (GET_CODE (SET_SRC (set)) == PLUS && REG_P (SET_DEST (set)))
 	base_reg = REGNO (SET_DEST (set));
-      else if ((REG_P (SET_DEST (set)) || rtx_equal_p (SET_DEST (set), pc_rtx))
-	       && MEM_P (SET_SRC (set)))
+      else if (REG_P (SET_DEST (set)) && MEM_P (SET_SRC (set)))
 	{
 	  int popped_reg = REGNO (SET_DEST (set));
 
-	  if (SET_DEST (set) == pc_rtx)
+	  if (popped_reg == PC_REG)
 	    pc_included = true;
 	  else if (lo_reg == -1 || hi_reg == -1)
 	    lo_reg = hi_reg = popped_reg;
@@ -682,7 +718,7 @@ vc4_emit_multi_reg_pop (rtx par)
     }
 }
 
-static rtx
+static rtx_insn *
 vc4_emit_push (int lo_reg, int hi_reg, bool include_lr)
 {
   int regs_to_push, i;
@@ -700,9 +736,8 @@ vc4_emit_push (int lo_reg, int hi_reg, bool include_lr)
   rtx par = gen_rtx_PARALLEL (VOIDmode, rtvec_alloc (regs_to_push + 1));
 
   XVECEXP (par, 0, 0)
-    = gen_rtx_SET (VOIDmode, sp,
-		   gen_rtx_PLUS (SImode, sp,
-				 GEN_INT (-regs_to_push * UNITS_PER_WORD)));
+    = gen_rtx_SET (sp,
+		   plus_constant (Pmode, sp, -regs_to_push * UNITS_PER_WORD));
 
   for (i = 0; i < regs_to_push; i++)
     {
@@ -712,10 +747,9 @@ vc4_emit_push (int lo_reg, int hi_reg, bool include_lr)
         regno = LR_REG;
 
       XVECEXP (par, 0, i + 1)
-        = gen_rtx_SET (VOIDmode,
-		       gen_rtx_MEM (SImode,
-			 gen_rtx_PLUS (SImode, sp,
-			   GEN_INT ((i - regs_to_push) * UNITS_PER_WORD))),
+        = gen_rtx_SET (gen_rtx_MEM (SImode,
+			 plus_constant (Pmode, sp,
+					(i - regs_to_push) * UNITS_PER_WORD)),
 		       gen_rtx_REG (SImode, regno));
     }
 
@@ -745,25 +779,22 @@ vc4_emit_pop (int lo_reg, int hi_reg, bool include_pc)
     XVECEXP (par, 0, vecidx++) = gen_vc4_return ();
 
   XVECEXP (par, 0, vecidx++)
-    = gen_rtx_SET (VOIDmode, sp,
-		   gen_rtx_PLUS (SImode, sp,
-				 GEN_INT (regs_to_pop * UNITS_PER_WORD)));
+    = gen_rtx_SET (sp,
+		   plus_constant (Pmode, sp, regs_to_pop * UNITS_PER_WORD));
 
   for (i = 0; i < regs_to_pop; i++)
     {
       rtx dst;
 
       if (include_pc && i == regs_to_pop - 1)
-        dst = pc_rtx;
+        dst = gen_rtx_REG (SImode, PC_REG);
       else
         dst = gen_rtx_REG (SImode, i + lo_reg);
 
       XVECEXP (par, 0, vecidx++)
-        = gen_rtx_SET (VOIDmode,
-		       dst,
+        = gen_rtx_SET (dst,
 		       gen_rtx_MEM (SImode,
-			 gen_rtx_PLUS (SImode, sp,
-			   GEN_INT (i * UNITS_PER_WORD))));
+			 plus_constant (Pmode, sp, i * UNITS_PER_WORD)));
     }
 
   if (include_pc)
@@ -780,7 +811,8 @@ vc4_expand_prologue (void)
   bool pushlr;
   rtx sp = gen_rtx_REG (Pmode, STACK_POINTER_REGNUM);
   rtx fp = gen_rtx_REG (Pmode, HARD_FRAME_POINTER_REGNUM);
-  rtx pat = NULL_RTX, insn = NULL_RTX;
+  rtx pat = NULL_RTX;
+  rtx_insn *insn = 0;
   struct machine_function *offsets = vc4_compute_frame ();
   
   pushlr = offsets->lrneedssaving;
@@ -815,8 +847,8 @@ vc4_expand_prologue (void)
   
   if (offsets->need_frame_pointer)
     {
-      emit_insn (gen_stack_tie (stack_pointer_rtx,
-				hard_frame_pointer_rtx));
+      /*emit_insn (gen_stack_tie (stack_pointer_rtx,
+				hard_frame_pointer_rtx));*/
       pat = gen_addsi3 (fp, sp, GEN_INT (offsets->outgoing_args_size));
       insn = emit_insn (pat);
       RTX_FRAME_RELATED_P (insn) = 1;
@@ -831,7 +863,7 @@ vc4_expand_epilogue (void)
   rtx sp = gen_rtx_REG (Pmode, STACK_POINTER_REGNUM);
   rtx fp = gen_rtx_REG (Pmode, HARD_FRAME_POINTER_REGNUM);
 
-  emit_insn (gen_blockage ());
+  /*emit_insn (gen_blockage ());*/
 
   struct machine_function *offsets = vc4_compute_frame ();
   
@@ -853,8 +885,6 @@ vc4_expand_epilogue (void)
   
   if (!pushlr)
     emit_jump_insn (gen_vc4_return ());
-
-  emit_use (sp);
 }
 
 void
@@ -871,7 +901,7 @@ rtx
 vc4_function_value (const_tree valtype, const_tree func ATTRIBUTE_UNUSED,
 		    bool outgoing ATTRIBUTE_UNUSED)
 {
-  enum machine_mode mode;
+  machine_mode mode;
 
   mode = TYPE_MODE(valtype);
 
@@ -896,7 +926,7 @@ vc4_function_value (const_tree valtype, const_tree func ATTRIBUTE_UNUSED,
  */
 
 static rtx
-vc4_function_arg (cumulative_args_t cum, enum machine_mode mode,
+vc4_function_arg (cumulative_args_t cum, machine_mode mode,
 		  const_tree type, bool named)
 {
   int arg_reg;
@@ -916,7 +946,7 @@ vc4_function_arg (cumulative_args_t cum, enum machine_mode mode,
 }
 
 static void
-vc4_function_arg_advance (cumulative_args_t cum_v, enum machine_mode mode,
+vc4_function_arg_advance (cumulative_args_t cum_v, machine_mode mode,
 			  const_tree type, bool named ATTRIBUTE_UNUSED)
 {
   CUMULATIVE_ARGS *cum = get_cumulative_args (cum_v);
@@ -925,7 +955,7 @@ vc4_function_arg_advance (cumulative_args_t cum_v, enum machine_mode mode,
 }
 
 static unsigned int
-vc4_function_arg_boundary(enum machine_mode mode,
+vc4_function_arg_boundary(machine_mode mode,
                           const_tree type ATTRIBUTE_UNUSED)
 {
     /*
@@ -945,7 +975,7 @@ vc4_function_arg_boundary(enum machine_mode mode,
  */
 
 static int
-vc4_arg_partial_bytes(cumulative_args_t cum, enum machine_mode mode,
+vc4_arg_partial_bytes(cumulative_args_t cum, machine_mode mode,
                       tree type, bool named)
 {
     int reg = *get_cumulative_args (cum);
@@ -1093,7 +1123,7 @@ vc4_fast_address_register_p (rtx x, bool strict_p)
 }
 
 static bool
-vc4_legitimate_address_p_1 (enum machine_mode mode ATTRIBUTE_UNUSED, rtx x,
+vc4_legitimate_address_p_1 (machine_mode mode ATTRIBUTE_UNUSED, rtx x,
 			    bool strict)
 {
   if (CONSTANT_ADDRESS_P (x))
@@ -1115,7 +1145,7 @@ vc4_legitimate_address_p_1 (enum machine_mode mode ATTRIBUTE_UNUSED, rtx x,
 }
 
 static bool
-vc4_legitimate_address_p (enum machine_mode mode, rtx x, bool strict)
+vc4_legitimate_address_p (machine_mode mode, rtx x, bool strict)
 {
   bool res;
 
@@ -1134,7 +1164,7 @@ vc4_legitimate_address_p (enum machine_mode mode, rtx x, bool strict)
 }
 
 bool
-vc4_short_form_addr_p (enum machine_mode mode, rtx x, bool strict_p)
+vc4_short_form_addr_p (machine_mode mode, rtx x, bool strict_p)
 {
   if (vc4_fast_address_register_p (x, strict_p)
       || (REG_P (x) && REGNO (x) == SP_REG))
@@ -1142,7 +1172,7 @@ vc4_short_form_addr_p (enum machine_mode mode, rtx x, bool strict_p)
 
   if (GET_CODE (x) == PLUS
       && vc4_fast_address_register_p (XEXP (x, 0), strict_p)
-      /*&& GET_MODE_SIZE (mode) == 4*/
+      && GET_MODE_SIZE (mode) == 4
       && GET_CODE (XEXP (x, 1)) == CONST_INT
       && INTVAL (XEXP (x, 1)) >= 0
       && INTVAL (XEXP (x, 1)) < 64
@@ -1171,7 +1201,7 @@ vc4_short_form_addr_p (enum machine_mode mode, rtx x, bool strict_p)
  */
 
 static bool
-vc4_legitimate_constant_p(enum machine_mode mode ATTRIBUTE_UNUSED, rtx x)
+vc4_legitimate_constant_p(machine_mode mode ATTRIBUTE_UNUSED, rtx x)
 {
     return GET_CODE(x) != CONST_DOUBLE;
 }

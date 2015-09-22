@@ -134,13 +134,11 @@
 (define_insn "vc4_pop_multi_return"
   [(match_parallel 0 "vc4_pop_multiple_return"
     [(return)
-     (set (match_operand:SI 1 "register_operand" "")
+     (set (match_operand:SI 1 "register_operand" "=r")
 	  (plus:SI (match_dup 1)
-		   (match_operand:SI 2 "const_int_operand" "")))
-     (set (match_operand:SI 3 "reg_or_pc_operand" "")
-	  (mem:SI (plus:SI
-		    (match_dup 1)
-		    (match_operand:SI 4 "const_int_operand" "i"))))])]
+		   (match_operand:SI 2 "const_int_operand" "i")))
+     (set (match_operand:SI 3 "register_operand" "=rk")
+	  (mem:SI (match_dup 1)))])]
   "reload_completed"
 {
   return vc4_emit_multi_reg_pop (operands[0]);
@@ -154,9 +152,7 @@
 	  (plus:SI (match_dup 1)
 		   (match_operand:SI 2 "const_int_operand" "i")))
      (set (match_operand:SI 3 "register_operand" "=r")
-	  (mem:SI (plus:SI
-		    (match_dup 1)
-		    (match_operand:SI 4 "const_int_operand" "i"))))])]
+	  (mem:SI (match_dup 1)))])]
   "reload_completed"
 {
   return vc4_emit_multi_reg_pop (operands[0]);
@@ -512,8 +508,7 @@
     )
   ]
   ""
-  "@
-  	flts %0, %1, sasr #0"
+  "flts %0, %1, sasr #0"
   [(set_attr "length" "4")]
 )
 
@@ -818,7 +813,7 @@
   [
     (set
       (reg:CC CC_REGNO)
-      (compare
+      (compare:CC
         (match_operand:SI 0 "register_operand" "f,f,r,r,r")
         (match_operand:SI 1 "nonmemory_operand" "f,I,r,I,i")
       )
@@ -838,7 +833,7 @@
   [
     (set
       (reg:CC CC_REGNO)
-      (compare
+      (compare:CC
         (match_operand:SF 0 "register_operand" "r")
         (match_operand:SF 1 "register_operand" "r")
       )

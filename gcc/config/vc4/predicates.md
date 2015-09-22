@@ -34,7 +34,3 @@
 {
   return vc4_push_pop_operation_p (op, false, true);
 })
-
-(define_special_predicate "reg_or_pc_operand"
-  (ior (match_operand 0 "register_operand")
-       (match_code "pc")))

@@ -155,9 +155,15 @@ enum {
     GP_REG, /* 24 */
     SP_REG, /* 25 */
     LR_REG, /* 26 */
-    AP_REG, /* 27 */
-    FP_REG, /* 28 */
-    CC_REG, /* 29 */
+    R27_REG, /* 27 */
+    R28_REG, /* 28 */
+    R29_REG, /* 29 */
+    R30_REG, /* 30 */
+    R31_REG, /* 31 */
+    PC_REG = 31, /* The PC is not exposed, but this is useful in pop insns.  */
+    AP_REG = 32, /* 32 */
+    FP_REG, /* 33 */
+    CC_REG, /* 34 */
 
     FIRST_PSEUDO_REGISTER
 };
@@ -181,18 +187,20 @@ enum {
   "r0",  "r1",  "r2",  "r3",  "r4",  "r5",  "r6",  "r7", \
   "r8",  "r9",  "r10", "r11", "r12", "r13", "r14", "r15", \
   "r16", "r17", "r18", "r19", "r20", "r21", "r22", "r23", \
-  "gp",  "sp",  "lr", \
+  "gp",  "sp",  "lr",  "r27", "r28", "r29", "r30", "r31", \
   "?ap", "?fp", "?cc" \
 }
 
 /* 1 for registers that have pervasive standard uses
    and are not available for the register allocator.  */
 #define FIXED_REGISTERS \
-{ \
- /*  r0  r1  r2  r3  r4  r5  r6  r7  r8  r9  r10 r11 r12 r13 r14 r15 */ \
-     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, \
- /*  r16 r17 r18 r19 r20 r21 r22 r23 gp  sp  lr  ?ap ?fp ?cc         */ \
-     0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  0,  1,  1,  1 \
+{									\
+/* r0  r1  r2  r3  r4  r5  r6  r7  r8  r9  r10 r11 r12 r13 r14 r15 */	\
+   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,	\
+/* r16 r17 r18 r19 r20 r21 r22 r23 gp  sp  lr  r27 r28 r29 r30 r31 */	\
+   0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  0,  1,  1,  1,  1,  1,	\
+/* ?ap ?fp ?cc */							\
+   1,  1,  1								\
 }
 
 
@@ -206,11 +214,13 @@ enum {
 /* RBE: r15 {link register} not available across calls,
    But we don't mark it that way here....  */
 #define CALL_USED_REGISTERS \
-{ \
- /*  r0  r1  r2  r3  r4  r5  r6  r7  r8  r9  r10 r11 r12 r13 r14 r15 */ \
-     1,  1,  1,  1,  1,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, \
- /*  r16 r17 r18 r19 r20 r21 r22 r23 gp  sp  lr  ?ap ?fp ?cc         */ \
-     0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1,  1,  1 \
+{									\
+/* r0  r1  r2  r3  r4  r5  r6  r7  r8  r9  r10 r11 r12 r13 r14 r15 */	\
+   1,  1,  1,  1,  1,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,	\
+/* r16 r17 r18 r19 r20 r21 r22 r23 gp  sp  lr  r27 r28 r29 r30 r31 */	\
+   0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1,  1,  1,  1,  1,	\
+/* ?ap ?fp ?cc */							\
+   1,  1,  1								\
 }
 
 /* Return number of consecutive hard regs needed starting at reg REGNO
@@ -295,6 +305,7 @@ enum reg_class {
     NO_REGS,
     FAST_REGS,
     GENERAL_REGS,
+    SPECIAL_REGS,
     AFP_REG,
     SFP_REG,
     CC_REGS,
@@ -311,6 +322,7 @@ enum reg_class {
   "NO_REGS",			\
   "FAST_REGS",			\
   "GENERAL_REGS",		\
+  "SPECIAL_REGS",		\
   "AFP_REG",			\
   "SFP_REG",			\
   "CC_REGS",			\
@@ -323,13 +335,14 @@ enum reg_class {
 
 #define REG_CLASS_CONTENTS		\
 {					\
-  { 0x00000000 },  /* NO_REGS */	\
-  { 0x0000ffff },  /* FAST_REGS */	\
-  { 0x07ffffff },  /* GENERAL_REGS */	\
-  { 0x08000000 },  /* AFP_REG */	\
-  { 0x10000000 },  /* SFP_REG */	\
-  { 0x20000000 },  /* CC_REGS */	\
-  { 0x27ffffff }   /* ALL_REGS */	\
+  { 0x00000000, 0x0 },  /* NO_REGS */	\
+  { 0x0000ffff, 0x0 },  /* FAST_REGS */ \
+  { 0x07ffffff, 0x0 },  /* GENERAL_REGS */	\
+  { 0xf8000000, 0x0 },  /* SPECIAL_REGS */	\
+  { 0x08000000, 0x1 },  /* AFP_REG */	\
+  { 0x10000000, 0x2 },  /* SFP_REG */	\
+  { 0x20000000, 0x4 },  /* CC_REGS */	\
+  { 0xffffffff, 0x4 }	/* ALL_REGS */  \
 }
 
 /* The same information, inverted:
@@ -494,7 +507,7 @@ extern const enum reg_class vc4_regno_reg_class[FIRST_PSEUDO_REGISTER];
 
 /* Define if operations between registers always perform the operation
    on the full register even if a narrower mode is specified.  */
-#define WORD_REGISTER_OPERATIONS
+#define WORD_REGISTER_OPERATIONS 1
 
 /* Define if loading in MODE, an integral mode narrower than BITS_PER_WORD
    will either zero-extend or sign-extend.  The value of this macro should

@@ -21,6 +21,9 @@
 (define_register_constraint "f" "FAST_REGS"
   "@internal")
 
+(define_register_constraint "k" "SPECIAL_REGS"
+  "@internal")
+
 ;; Integer constraints.
 (define_constraint "I"
   "A 5-bit unsigned integer in the range 0 to 31, mostly used in ALU ops."
@@ -51,4 +54,4 @@
 (define_memory_constraint "Us"
   "A memory operand suitable for short-form memory ops."
   (and (match_code "mem")
-       (match_test "vc4_short_form_addr_p (mode, XEXP (op, 0), true)")))
+       (match_test "vc4_short_form_addr_p (mode, XEXP (op, 0), false)")))
