@@ -40,9 +40,9 @@
 (define_mode_iterator SIF [SI SF])
 (define_mode_attr suffix [(QI "b") (HI "h") (SI "") (SF "")])
 
-;(define_c_enum "unspec" [
-;  UNSPEC_PUSH_MULTI
-;])
+(define_c_enum "unspec" [
+  UNSPEC_PRLG_STK
+])
 
 ;; --- Special --------------------------------------------------------------
 
@@ -134,7 +134,23 @@
 (define_insn "vc4_pop_multi_return"
   [(match_parallel 0 "vc4_pop_multiple_return"
     [(return)
-     (set (match_operand:SI 1 "register_operand" "=r")
+     (set (match_operand:SI 1 "register_operand" "")
+	  (plus:SI (match_dup 1)
+		   (match_operand:SI 2 "const_int_operand" "")))
+     (set (match_operand:SI 3 "reg_or_pc_operand" "")
+	  (mem:SI (plus:SI
+		    (match_dup 1)
+		    (match_operand:SI 4 "const_int_operand" "i"))))])]
+  "reload_completed"
+{
+  return vc4_emit_multi_reg_pop (operands[0]);
+}
+  [(set_attr "length" "2")]
+)
+
+(define_insn "vc4_pop_multi"
+  [(match_parallel 0 "vc4_pop_multiple"
+    [(set (match_operand:SI 1 "register_operand" "=r")
 	  (plus:SI (match_dup 1)
 		   (match_operand:SI 2 "const_int_operand" "i")))
      (set (match_operand:SI 3 "register_operand" "=r")
@@ -169,6 +185,16 @@
   ""
   "rts"
   [(set_attr "length" "2")]
+)
+
+(define_insn "stack_tie"
+  [(set (mem:BLK (scratch))
+	(unspec:BLK [(match_operand:SI 0 "register_operand" "r")
+		     (match_operand:SI 1 "register_operand" "r")]
+		    UNSPEC_PRLG_STK))]
+  ""
+  ""
+  [(set_attr "length" "0")]
 )
 
 ;; --- Generic arithmetic ---------------------------------------------------
@@ -268,10 +294,10 @@
 (define_insn "*vc4_<alu_fast:alu_insn>_fast"
   [
     (set
-      (match_operand:SI 0 "register_operand" "=f,f,r,r,r,r")
+      (match_operand:SI 0 "register_operand" "=f,f,r,r,r")
       (alu_fast:SI
-	(match_operand:SI 1 "register_operand" "0,0,r,0,0,r")
-	(match_operand:SI 2 "nonmemory_operand" "I,f,I,i,r,r")
+	(match_operand:SI 1 "register_operand" "0,0,r,0,r")
+	(match_operand:SI 2 "nonmemory_operand" "I,f,I,i,r")
       )
     )
   ]
@@ -281,18 +307,17 @@
   	<alu_fast:alu_opcode> %0, %2 ; fast reg
   	<alu_fast:alu_opcode> %0, %1, #%2 ; slow smallint
   	<alu_fast:alu_opcode> %0, #%2 ; largeint 2op
-  	<alu_fast:alu_opcode> %0, %2 ; slow
   	<alu_fast:alu_opcode> %0, %1, %2"
-  [(set_attr "length" "2,2,4,6,4,4")]
+  [(set_attr "length" "2,2,4,6,4")]
 )
 
 (define_insn "*vc4_<alu_slow:alu_insn>_slow"
   [
     (set
-      (match_operand:SI 0 "register_operand" "=r,r,r,r")
+      (match_operand:SI 0 "register_operand" "=r,r,r")
       (alu_slow:SI
-	(match_operand:SI 1 "register_operand" "r,0,0,r")
-	(match_operand:SI 2 "nonmemory_operand" "I,i,r,r")
+	(match_operand:SI 1 "register_operand" "r,0,r")
+	(match_operand:SI 2 "nonmemory_operand" "I,i,r")
       )
     )
   ]
@@ -300,9 +325,8 @@
   "@
   	<alu_slow:alu_opcode> %0, %1, #%2
   	<alu_slow:alu_opcode> %0, #%2 ; largeint 2op
-  	<alu_slow:alu_opcode> %0, %2 ; slow
   	<alu_slow:alu_opcode> %0, %1, %2"
-  [(set_attr "length" "4,6,4,4")]
+  [(set_attr "length" "4,6,4")]
 )
 
 ;; --- Special-cased arithmetic ---------------------------------------------
@@ -312,10 +336,10 @@
 (define_insn "subsi3"
   [
     (set
-      (match_operand:SI 0 "register_operand" "=f,f,f,f,r,r,r,r,r,r,r")
+      (match_operand:SI 0 "register_operand" "=f,f,f,f,r,r,r,r,r")
       (minus:SI
-        (match_operand:SI 1 "register_operand" "0,I,0,f,r,I,0,i,0,r,r")
-        (match_operand:SI 2 "nonmemory_operand" "I,0,f,0,I,0,i,0,r,0,r")
+        (match_operand:SI 1 "register_operand" "0,I,0,f,r,I,0,i,r")
+        (match_operand:SI 2 "nonmemory_operand" "I,0,f,0,I,0,i,0,r")
       )
     )
   ]
@@ -329,10 +353,8 @@
   	rsub %0, %1, #%1 ; slow smallint
   	sub %0, #%2 ; largeint 2op
   	rsub %0, #%1 ; largeint 2op
-  	sub %0, %2 ; slow
-  	rsub %0, %1 ; slow
   	sub %0, %1, %2"
-  [(set_attr "length" "2,2,2,2,4,4,6,6,4,4,4")]
+  [(set_attr "length" "2,2,2,2,4,4,6,6,4")]
 )
 
 (define_insn "divsi3"
@@ -806,8 +828,8 @@
   "@
   	cmp %0, %1 ; fast
 	cmp %0, #%1 ; fast
-	cmp %0, %1
-	cmp %0, #%1
+	cmp %0, r0, %1
+	cmp %0, r0, #%1 ; assembler workaround
 	cmp %0, #%1 ; largeint"
   [(set_attr "length" "2,2,4,4,6")]
 )
