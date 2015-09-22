@@ -24,8 +24,10 @@
 #ifndef VC4_PROTOS_H
 #define VC4_PROTOS_H 1
 
+extern void vc4_init_expanders (void);
 extern int vc4_initial_elimination_offset(int, int);
 
+extern bool vc4_regno_ok_for_base_p (int regno, bool strict_p);
 extern bool vc4_short_form_addr_p (enum machine_mode, rtx, bool);
 extern bool vc4_push_pop_operation_p (rtx op, bool is_push, bool returns);
 extern const char *vc4_emit_multi_reg_push (rtx par);

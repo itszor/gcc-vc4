@@ -223,7 +223,9 @@ enum {
    (((GET_MODE_SIZE (MODE) + UNITS_PER_WORD - 1) / UNITS_PER_WORD))
 
 /* Value is 1 if hard register REGNO can hold a value of machine-mode MODE. */
-#define HARD_REGNO_MODE_OK(REGNO, MODE) ((REGNO) < AP_REG)
+#define HARD_REGNO_MODE_OK(REGNO, MODE)			\
+  ((REGNO) < AP_REG || (REGNO) == ARG_POINTER_REGNUM	\
+   || (REGNO) == FRAME_POINTER_REGNUM)
 
 /* Value is 1 if it is a good idea to tie two pseudo registers
    when one has mode MODE1 and one has mode MODE2.
@@ -257,7 +259,10 @@ enum {
 /* Define the offset between two registers, one to be eliminated, and the other
    its replacement, at the start of a routine.  */
 #define INITIAL_ELIMINATION_OFFSET(FROM, TO, OFFSET) \
-  (OFFSET) = vc4_initial_elimination_offset (FROM, TO)
+  (OFFSET) = vc4_initial_elimination_offset ((FROM), (TO))
+
+#define HARD_FRAME_POINTER_IS_FRAME_POINTER 0
+#define HARD_FRAME_POINTER_IS_ARG_POINTER 0
 
 /* Define the classes of registers for register constraints in the
    machine description.  Also define ranges of constants.
@@ -355,6 +360,8 @@ extern const enum reg_class vc4_regno_reg_class[FIRST_PSEUDO_REGISTER];
 #define FIRST_PARM_REG 0
 #define FIRST_RET_REG 0
 
+#define INIT_EXPANDERS vc4_init_expanders ()
+
 /* Define this if pushing a word on the stack
    makes the stack pointer a smaller address.  */
 #define STACK_GROWS_DOWNWARD 1
@@ -391,7 +398,7 @@ extern const enum reg_class vc4_regno_reg_class[FIRST_PSEUDO_REGISTER];
 
 /* 1 if N is a possible register number for function argument passing.  */
 #define FUNCTION_ARG_REGNO_P(REGNO) \
-  ((REGNO) >= FIRST_PARM_REG && (REGNO) < (NPARM_REGS + FIRST_PARM_REG))
+  (IN_RANGE ((REGNO), FIRST_PARM_REG, (NPARM_REGS + FIRST_PARM_REG)))
 
 /* Define a data type for recording info about an argument list
    during the scan of that argument list.  This data type should
@@ -444,16 +451,19 @@ extern const enum reg_class vc4_regno_reg_class[FIRST_PSEUDO_REGISTER];
 
 /* Macros to check register numbers against specific register classes.  */
 
-/* These assume that REGNO is a hard or pseudo reg number.
-   They give nonzero only if REGNO is a hard reg of the suitable class
-   or a pseudo reg currently allocated to a suitable hard reg.
-   Since they use reg_renumber, they are safe only once reg_renumber
-   has been allocated, which happens in reginfo.c during register
-   allocation.  */
-#define REGNO_OK_FOR_BASE_P(REGNO)  \
-  ((REGNO) < AP_REG || (unsigned) reg_renumber[(REGNO)] < AP_REG)
+#ifdef REG_OK_STRICT
 
-#define REGNO_OK_FOR_INDEX_P(REGNO)   0
+#define REGNO_OK_FOR_BASE_P(REGNO) \
+  vc4_regno_ok_for_base_p ((REGNO), true)
+
+#else
+
+#define REGNO_OK_FOR_BASE_P(REGNO) \
+  vc4_regno_ok_for_base_p ((REGNO), false)
+
+#endif
+
+#define REGNO_OK_FOR_INDEX_P(REGNO) 0
 
 /* Maximum number of registers that can appear in a valid memory 
    address.  */
@@ -529,23 +539,23 @@ extern const enum reg_class vc4_regno_reg_class[FIRST_PSEUDO_REGISTER];
 
 /* This is how to output an insn to push a register on the stack.
    It need not be very fast code.  */
-#define ASM_OUTPUT_REG_PUSH(FILE,REGNO)  \
+/*#define ASM_OUTPUT_REG_PUSH(FILE,REGNO)  \
   fprintf (FILE, "\tsubi\t %s,%d\n\tstw\t %s,(%s)\n",	\
 	   reg_names[STACK_POINTER_REGNUM],		\
 	   (STACK_BOUNDARY / BITS_PER_UNIT),		\
 	   reg_names[REGNO],				\
-	   reg_names[STACK_POINTER_REGNUM])
+	   reg_names[STACK_POINTER_REGNUM])*/
 
 /* Length in instructions of the code output by ASM_OUTPUT_REG_PUSH.  */
-#define REG_PUSH_LENGTH 2
+/*#define REG_PUSH_LENGTH 2*/
 
 /* This is how to output an insn to pop a register from the stack.  */
-#define ASM_OUTPUT_REG_POP(FILE,REGNO)  \
+/*#define ASM_OUTPUT_REG_POP(FILE,REGNO)  \
   fprintf (FILE, "\tldw\t %s,(%s)\n\taddi\t %s,%d\n",	\
 	   reg_names[REGNO],				\
 	   reg_names[STACK_POINTER_REGNUM],		\
 	   reg_names[STACK_POINTER_REGNUM],		\
-	   (STACK_BOUNDARY / BITS_PER_UNIT))
+	   (STACK_BOUNDARY / BITS_PER_UNIT))*/
 
 
 /* Output a reference to a label.  */

@@ -85,23 +85,24 @@ struct GTY (()) machine_function {
     int local_vars;
     int local_vars_padding;
 
+    int outgoing_args_size;
+
     /* Topmost register which needs to be saved (or 0 if none). */
     int topreg;
 
 	/* Does LR need to be saved? */
 	bool lrneedssaving;
+	bool need_frame_pointer;
 };
 
-/*
- * Zero initialization is OK for all current fields.  
- */
+/* Zero initialization is OK for all current fields.  */
 
 static struct machine_function *vc4_init_machine_status(void)
 {
-    return ggc_alloc_cleared_machine_function();
+  return ggc_alloc_cleared_machine_function();
 }
 
-static void vc4_compute_frame(void);
+static struct machine_function *vc4_compute_frame(void);
 static tree vc4_handle_naked_attribute(tree *, tree, tree, int, bool *);
 
 /*
@@ -300,46 +301,51 @@ static int number_of_regs_before_varargs;
 static int current_function_anonymous_args;
 
 /* Calculates the offset needed to convert accesses to the specified register
- * to instead be an access to the stack pointer. */
+   to instead be an access to the stack pointer.  */
 
-static int register_offset(int reg)
+static int
+register_offset (struct machine_function *offsets, int reg)
 {
-	int offset = 0;
+  int offset = 0;
 
-	switch (reg)
-	{
-		default:
-			abort();
+  switch (reg)
+    {
+    case STACK_POINTER_REGNUM:
+      offset += offsets->outgoing_args_size;
+      /* fall through */
+    
+    case HARD_FRAME_POINTER_REGNUM:
+    case FRAME_POINTER_REGNUM:
+      offset += offsets->callee_saves
+		+ offsets->local_vars
+		+ offsets->local_vars_padding;
+      /* fall through */
 
+    case ARG_POINTER_REGNUM:
+      break;
 
-		case ARG_POINTER_REGNUM:
-			offset += cfun->machine->callee_saves;
-			/* fall through */
-			offset += cfun->machine->local_vars +
-			          cfun->machine->local_vars_padding;
-			/* fall through */
-		case HARD_FRAME_POINTER_REGNUM:
-		case FRAME_POINTER_REGNUM:
-			/* fall through */
-			offset += crtl->outgoing_args_size;
-			/* fall through */
-		case STACK_POINTER_REGNUM:
-			break;
-	}
+    default:
+      gcc_unreachable ();
+    }
 
-	return offset;
+  return offset;
 }
 
-/*
- * Implements the macro INITIAL_ELIMINATION_OFFSET. Returns the offset
- * between the two specified registers.
- */
+/* Implements the macro INITIAL_ELIMINATION_OFFSET. Returns the offset
+   between the two specified registers.  */
 
-int vc4_initial_elimination_offset(int from, int to)
+int
+vc4_initial_elimination_offset (int from, int to)
 {
-  vc4_compute_frame();
+  struct machine_function *offsets = vc4_compute_frame ();
+  int diff;
 
-  return register_offset(to) - register_offset(from);
+  diff = register_offset (offsets, from) - register_offset (offsets, to);
+
+  fprintf (stderr, "eliminating %s to %s: diff = %d\n", reg_names[from],
+	   reg_names[to], diff);
+
+  return diff;
 }
 
 bool
@@ -413,155 +419,73 @@ vc4_setup_incoming_varargs(cumulative_args_t args_so_far_v,
  * prologue and epilogue.  
  */
 
-static void vc4_compute_frame (void)
+static struct machine_function *
+vc4_compute_frame (void)
 {
   /* For aligning the local variables.  */
   int stack_alignment = STACK_BOUNDARY / BITS_PER_UNIT;
   int padding_locals;
   int regno;
+  struct machine_function *offsets = cfun->machine;
+  
+  if (reload_completed)
+    return offsets;
+
+  offsets->need_frame_pointer = frame_pointer_needed;
+  offsets->outgoing_args_size = crtl->outgoing_args_size;
 
   /* Padding needed for each element of the frame.  */
-  cfun->machine->local_vars = get_frame_size();
+  offsets->local_vars = get_frame_size();
 
   /* Align to the stack alignment.  */
-  padding_locals = cfun->machine->local_vars % stack_alignment;
+  padding_locals = offsets->local_vars % stack_alignment;
 
   if (padding_locals)
     padding_locals = stack_alignment - padding_locals;
 
-  cfun->machine->local_vars_padding = padding_locals;
+  offsets->local_vars_padding = padding_locals;
 
   /* Save callee-saved registers.  */
-  cfun->machine->topreg = 0;
+  offsets->topreg = 0;
 
   for (regno = 0; regno < FIRST_PSEUDO_REGISTER; regno++)
     if (df_regs_ever_live_p (regno) && (!call_used_regs[regno]))
-      cfun->machine->topreg = regno;
+      offsets->topreg = regno;
 
   /* Check to see if lr needs saving. */
-  cfun->machine->lrneedssaving = !leaf_function_p ();
+  offsets->lrneedssaving = !leaf_function_p ()
+				 || df_regs_ever_live_p (LR_REG);
 
-  cfun->machine->callee_saves = (cfun->machine->lrneedssaving ? 4 : 0);
+  offsets->callee_saves = (offsets->lrneedssaving ? 4 : 0);
 
-  if (cfun->machine->topreg > 0)
-    cfun->machine->callee_saves += (cfun->machine->topreg - 5) * 4;
+  if (offsets->topreg > 0)
+    offsets->callee_saves += (offsets->topreg - 5) * 4;
+  
+  return offsets;
 }
 
 static void
 vc4_target_asm_function_prologue (FILE *file,
 				  HOST_WIDE_INT size ATTRIBUTE_UNUSED)
 {
-#if 0
-  int sp_adjust;
-  bool pushlr;
-#endif
+  struct machine_function *offsets = vc4_compute_frame ();
 
-  vc4_compute_frame ();
+  fprintf (file, "\t; callee saves = %d bytes\n", offsets->callee_saves);
+  fprintf (file, "\t; local vars = %d+%d bytes\n", offsets->local_vars,
+	   offsets->local_vars_padding);
+  fprintf (file, "\t; outgoing = %d bytes\n", offsets->outgoing_args_size);
 
-  fprintf (file, "\t; callee saves = %d bytes\n", cfun->machine->callee_saves);
-  fprintf (file, "\t; local vars = %d+%d bytes\n", cfun->machine->local_vars,
-	   cfun->machine->local_vars_padding);
-  fprintf (file, "\t; outgoing = %d bytes\n", crtl->outgoing_args_size);
-
-  fprintf (file, "\t; needs frame pointer = %d\n", frame_pointer_needed);
-  fprintf (file, "\t; topreg = %d\n", cfun->machine->topreg);
-  fprintf (file, "\t; lr needs saving = %d\n", cfun->machine->lrneedssaving);
-
-#if 0
-  pushlr = cfun->machine->lrneedssaving;
-
-  /* Save callee-saved registers. */
-
-  if (cfun->machine->topreg > 0)
-    {
-      rtx op = gen_rtx_REG (Pmode, cfun->machine->topreg);
-
-      if (cfun->machine->topreg == R6_REG)
-	output_asm_insn (pushlr ? "push %0, lr" : "push %0", &op);
-      else
-	output_asm_insn (pushlr ? "push r6-%0, lr" : "push r6-%0", &op);
-    }
-  else if (pushlr)
-    output_asm_insn ("push lr", NULL);
-
-  /* Does not include callee_saves, as the push instruction adjusts sp
-     for us. */
-
-  sp_adjust = cfun->machine->local_vars + cfun->machine->local_vars_padding
-	      + crtl->outgoing_args_size;
-
-  /* Allocate space for locals. */
-
-  if (sp_adjust > 0)
-    {
-      rtx ops[2] =
-	{
-    	  stack_pointer_rtx,
-    	  GEN_INT (sp_adjust)
-	};
-      output_asm_insn ("sub %0, #%1", ops);
-    }
-
-  /* If we need a frame pointer, set it up now. */
-
-  if (frame_pointer_needed)
-    {
-      rtx ops[] =
-	{
-	  gen_rtx_REG (Pmode, HARD_FRAME_POINTER_REGNUM),
-	  gen_rtx_REG (Pmode, STACK_POINTER_REGNUM),
-	  GEN_INT (crtl->outgoing_args_size)
-	};
-
-      output_asm_insn("add %0, %1, #%2", ops);
-    }
-#endif
+  fprintf (file, "\t; needs frame pointer = %s\n",
+	   offsets->need_frame_pointer ? "true" : "false");
+  fprintf (file, "\t; topreg = %d\n", offsets->topreg);
+  fprintf (file, "\t; lr needs saving = %s\n",
+	   offsets->lrneedssaving ? "true" : "false");
 }
 
 static void
 vc4_target_asm_function_epilogue (FILE *file ATTRIBUTE_UNUSED,
 				  HOST_WIDE_INT size ATTRIBUTE_UNUSED)
 {
-#if 0
-	bool pushlr;
-	int sp_adjust;
-
-    vc4_compute_frame();
-
-	pushlr = cfun->machine->lrneedssaving;
-
-	/* Otherwise retract over the locals. */
-
-	sp_adjust = cfun->machine->local_vars +
-		cfun->machine->local_vars_padding + crtl->outgoing_args_size;
-
-	if (sp_adjust > 0)
-	{
-		rtx ops[2] =
-		{
-			stack_pointer_rtx,
-			GEN_INT(sp_adjust)
-		};
-		output_asm_insn("add %0, #%1", ops);
-	}
-
-    /*
-     * Reload callee-saved registers and return.
-     */
-    if (cfun->machine->topreg > 0)
-    {
-		rtx op = gen_rtx_REG(Pmode, cfun->machine->topreg);
-    	if (cfun->machine->topreg == 6)
-    		output_asm_insn(pushlr ? "pop %0, pc" : "pop %0", &op);
-    	else
-    		output_asm_insn(pushlr ? "pop r6-%0, pc" : "pop r6-%0", &op);
-    }
-    else if (pushlr)
-    	output_asm_insn("pop pc", NULL);
-
-	if (!pushlr)
-		output_asm_insn("rts", NULL);
-#endif
 }
 
 bool
@@ -662,7 +586,10 @@ vc4_emit_multi_reg_push (rtx par)
       else
         {
 	  operands[0] = gen_rtx_REG (SImode, lo_reg);
-          output_asm_insn ("push %0, lr", operands);
+	  if (lr_included)
+            output_asm_insn ("push %0, lr", operands);
+	  else
+	    output_asm_insn ("push %0", operands);
 	  return "";
 	}
     }
@@ -736,7 +663,10 @@ vc4_emit_multi_reg_pop (rtx par)
       else
         {
 	  operands[0] = gen_rtx_REG (SImode, lo_reg);
-          output_asm_insn ("pop %0, pc", operands);
+	  if (pc_included)
+            output_asm_insn ("pop %0, pc", operands);
+	  else
+	    output_asm_insn ("pop %0", operands);
 	  return "";
 	}
     }
@@ -797,7 +727,7 @@ vc4_emit_pop (int lo_reg, int hi_reg, bool include_pc)
 {
   int regs_to_pop, i;
   rtx sp = gen_rtx_REG (SImode, SP_REG);
-  int vecidx;
+  int vecidx = 0;
   
   if (lo_reg == -1 && hi_reg == -1)
     regs_to_pop = 0;
@@ -850,34 +780,46 @@ vc4_expand_prologue (void)
   bool pushlr;
   rtx sp = gen_rtx_REG (Pmode, STACK_POINTER_REGNUM);
   rtx fp = gen_rtx_REG (Pmode, HARD_FRAME_POINTER_REGNUM);
-  rtx insn;
-
-  vc4_compute_frame ();
+  rtx pat = NULL_RTX, insn = NULL_RTX;
+  struct machine_function *offsets = vc4_compute_frame ();
   
-  pushlr = cfun->machine->lrneedssaving;
+  pushlr = offsets->lrneedssaving;
   
-  if (cfun->machine->topreg > 0)
-    insn = vc4_emit_push (R6_REG, cfun->machine->topreg, true);
-  else
+  if (offsets->topreg > 0)
+    insn = vc4_emit_push (R6_REG, offsets->topreg, pushlr);
+  else if (pushlr)
     insn = vc4_emit_push (-1, -1, true);
   
-  RTX_FRAME_RELATED_P (insn) = 1;
+  if (insn)
+    {
+#if 0
+      rtx par = PATTERN (insn);
+      int i;
+
+      for (i = 0; i < XVECLEN (par, 0); i++)
+        RTX_FRAME_RELATED_P (XVECEXP (par, 0, i)) = 1;
+#endif
+
+      RTX_FRAME_RELATED_P (insn) = 1;
+    }
   
-  sp_adjust = cfun->machine->local_vars + cfun->machine->local_vars_padding
-	      + crtl->outgoing_args_size;
+  sp_adjust = offsets->local_vars + offsets->local_vars_padding
+	      + offsets->outgoing_args_size;
 
   if (sp_adjust > 0)
     {
-      insn = gen_addsi3 (sp, sp, GEN_INT (-sp_adjust));
+      pat = gen_addsi3 (sp, sp, GEN_INT (-sp_adjust));
+      insn = emit_insn (pat);
       RTX_FRAME_RELATED_P (insn) = 1;
-      emit_insn (insn);
     }
   
-  if (frame_pointer_needed)
+  if (offsets->need_frame_pointer)
     {
-      insn = gen_addsi3 (fp, sp, GEN_INT (crtl->outgoing_args_size));
+      emit_insn (gen_stack_tie (stack_pointer_rtx,
+				hard_frame_pointer_rtx));
+      pat = gen_addsi3 (fp, sp, GEN_INT (offsets->outgoing_args_size));
+      insn = emit_insn (pat);
       RTX_FRAME_RELATED_P (insn) = 1;
-      emit_insn (insn);
     }
 }
 
@@ -891,36 +833,34 @@ vc4_expand_epilogue (void)
 
   emit_insn (gen_blockage ());
 
-  vc4_compute_frame ();
+  struct machine_function *offsets = vc4_compute_frame ();
   
-  pushlr = cfun->machine->lrneedssaving;
+  pushlr = offsets->lrneedssaving;
   
-  sp_adjust = cfun->machine->local_vars + cfun->machine->local_vars_padding
-	      + crtl->outgoing_args_size;
+  sp_adjust = offsets->local_vars + offsets->local_vars_padding
+	      + offsets->outgoing_args_size;
 
-  if (frame_pointer_needed)
-    gen_addsi3 (sp, fp, GEN_INT (cfun->machine->local_vars
-				 + cfun->machine->local_vars_padding));
+  if (offsets->need_frame_pointer)
+    gen_addsi3 (sp, fp, GEN_INT (offsets->local_vars
+				 + offsets->local_vars_padding));
   else if (sp_adjust > 0)
     gen_addsi3 (sp, sp, GEN_INT (sp_adjust));
   
-  if (cfun->machine->topreg > 0)
-    vc4_emit_pop (R6_REG, cfun->machine->topreg, true);
+  if (offsets->topreg > 0)
+    vc4_emit_pop (R6_REG, offsets->topreg, pushlr);
   else if (pushlr)
     vc4_emit_pop (-1, -1, true);
-  else
-    emit_jump_insn (simple_return_rtx);
+  
+  if (!pushlr)
+    emit_jump_insn (gen_vc4_return ());
 
   emit_use (sp);
 }
 
-static void
-vc4_option_override(void)
+void
+vc4_init_expanders (void)
 {
-    /*
-     * Set the per-function-data initializer.  
-     */
-    init_machine_status = vc4_init_machine_status;
+  init_machine_status = vc4_init_machine_status;
 }
 
 
@@ -969,7 +909,7 @@ vc4_function_arg (cumulative_args_t cum, enum machine_mode mode,
 
   arg_reg = *get_cumulative_args (cum);
 
-  if (arg_reg + num_arg_regs (mode, type) < NPARM_REGS)
+  if (arg_reg + num_arg_regs (mode, type) <= NPARM_REGS)
     return gen_rtx_REG (mode, arg_reg + FIRST_PARM_REG);
 
   return 0;
@@ -1090,20 +1030,71 @@ vc4_return_in_memory(const_tree type, const_tree fntype ATTRIBUTE_UNUSED)
     return (size == -1 || size > 2 * UNITS_PER_WORD);
 }
 
-static bool
-vc4_address_register_p (rtx x, bool strict)
+bool
+vc4_regno_ok_for_base_p (int regno, bool strict_p)
 {
-  return REG_P (x)
-	 && (REGNO (x) < AP_REG
-	     || (!strict
-		 && (REGNO (x) >= FIRST_PSEUDO_REGISTER
-		     /*|| REGNO (x) == FRAME_POINTER_REGNUM
-		     || REGNO (x) == ARG_POINTER_REGNUM*/)));
+  if (regno >= FIRST_PSEUDO_REGISTER)
+    {
+      if (!strict_p)
+        return true;
+
+      if (!reg_renumber)
+	return false;
+
+      regno = reg_renumber[regno];
+    }
+
+  return regno < AP_REG
+	 || regno == ARG_POINTER_REGNUM
+	 || regno == FRAME_POINTER_REGNUM;
 }
 
 static bool
-vc4_legitimate_address_p (enum machine_mode mode ATTRIBUTE_UNUSED, rtx x,
-			  bool strict)
+vc4_address_register_p (rtx x, bool strict_p)
+{
+  if (GET_CODE (x) == SUBREG)
+    x = SUBREG_REG (x);
+
+  if (!REG_P (x))
+    return false;
+
+  return vc4_regno_ok_for_base_p (REGNO (x), strict_p);
+}
+
+static bool
+vc4_regno_ok_for_fast_base_p (int regno, bool strict_p)
+{
+  if (regno >= FIRST_PSEUDO_REGISTER)
+    {
+      if (!strict_p)
+        return true;
+
+      if (!reg_renumber)
+	return false;
+
+      regno = reg_renumber[regno];
+    }
+
+  return regno < 16
+	 || regno == ARG_POINTER_REGNUM
+	 || regno == FRAME_POINTER_REGNUM;
+}
+
+static bool
+vc4_fast_address_register_p (rtx x, bool strict_p)
+{
+  if (GET_CODE (x) == SUBREG)
+    x = SUBREG_REG (x);
+
+  if (!REG_P (x))
+    return false;
+  
+  return vc4_regno_ok_for_fast_base_p (REGNO (x), strict_p);
+}
+
+static bool
+vc4_legitimate_address_p_1 (enum machine_mode mode ATTRIBUTE_UNUSED, rtx x,
+			    bool strict)
 {
   if (CONSTANT_ADDRESS_P (x))
     return true;
@@ -1123,18 +1114,50 @@ vc4_legitimate_address_p (enum machine_mode mode ATTRIBUTE_UNUSED, rtx x,
   return false;
 }
 
-bool
-vc4_short_form_addr_p (enum machine_mode mode, rtx x, bool strict)
+static bool
+vc4_legitimate_address_p (enum machine_mode mode, rtx x, bool strict)
 {
-  if (vc4_address_register_p (x, strict))
+  bool res;
+
+#if 0
+  fprintf (stderr, "check address: ");
+  dump_value_slim (stderr, x, 0);
+#endif
+
+  res = vc4_legitimate_address_p_1 (mode, x, strict);
+
+#if 0
+  fprintf (stderr, "  %s\n", (res ? "OK" : "unrecognized"));
+#endif
+
+  return res;
+}
+
+bool
+vc4_short_form_addr_p (enum machine_mode mode, rtx x, bool strict_p)
+{
+  if (vc4_fast_address_register_p (x, strict_p)
+      || (REG_P (x) && REGNO (x) == SP_REG))
     return true;
 
   if (GET_CODE (x) == PLUS
-      && vc4_address_register_p (XEXP (x, 0), strict)
-      && mode == SImode
+      && vc4_fast_address_register_p (XEXP (x, 0), strict_p)
+      /*&& GET_MODE_SIZE (mode) == 4*/
       && GET_CODE (XEXP (x, 1)) == CONST_INT
       && INTVAL (XEXP (x, 1)) >= 0
       && INTVAL (XEXP (x, 1)) < 64
+      && (INTVAL (XEXP (x, 1)) & 3) == 0)
+    return true;
+
+  if (GET_CODE (x) == PLUS
+      && REG_P (XEXP (x, 0))
+      && (REGNO (XEXP (x, 0)) == SP_REG
+	  || (strict_p && REGNO (XEXP (x, 0)) >= FIRST_PSEUDO_REGISTER
+	      && reg_renumber[REGNO (XEXP (x, 0))] == SP_REG))
+      && GET_MODE_SIZE (mode) == 4
+      && GET_CODE (XEXP (x, 1)) == CONST_INT
+      && INTVAL (XEXP (x, 1)) >= 0
+      && INTVAL (XEXP (x, 1)) < 128
       && (INTVAL (XEXP (x, 1)) & 3) == 0)
     return true;
 
@@ -1203,14 +1226,11 @@ vc4_legitimate_constant_p(enum machine_mode mode ATTRIBUTE_UNUSED, rtx x)
 #undef  TARGET_SETUP_INCOMING_VARARGS
 #define TARGET_SETUP_INCOMING_VARARGS	vc4_setup_incoming_varargs
 
-#undef TARGET_OPTION_OVERRIDE
-#define TARGET_OPTION_OVERRIDE          vc4_option_override
-
 #undef TARGET_LEGITIMATE_ADDRESS_P
 #define TARGET_LEGITIMATE_ADDRESS_P	vc4_legitimate_address_p
 
-#undef TARGET_LEGITIMATE_CONSTANT_P
-#define TARGET_LEGITIMATE_CONSTANT_P    vc4_legitimate_constant_p
+/*#undef TARGET_LEGITIMATE_CONSTANT_P
+#define TARGET_LEGITIMATE_CONSTANT_P    vc4_legitimate_constant_p*/
 
 #undef TARGET_WARN_FUNC_RETURN
 #define TARGET_WARN_FUNC_RETURN         vc4_warn_func_return
@@ -1227,11 +1247,11 @@ vc4_legitimate_constant_p(enum machine_mode mode ATTRIBUTE_UNUSED, rtx x)
 #undef TARGET_REGISTER_MOVE_COST
 #define TARGET_REGISTER_MOVE_COST       vc4_target_register_move_cost
 
-#undef TARGET_MEMORY_MOVE_COST
-#define TARGET_MEMORY_MOVE_COST         vc4_target_memory_move_cost
+/*#undef TARGET_MEMORY_MOVE_COST
+#define TARGET_MEMORY_MOVE_COST         vc4_target_memory_move_cost*/
 
-#undef  TARGET_ADDRESS_COST
-#define TARGET_ADDRESS_COST 		vc4_target_address_cost
+/*#undef  TARGET_ADDRESS_COST
+#define TARGET_ADDRESS_COST 		vc4_target_address_cost*/
 
 #undef TARGET_RTX_COSTS
 #define TARGET_RTX_COSTS                vc4_target_rtx_costs
