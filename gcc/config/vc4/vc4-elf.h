@@ -66,7 +66,7 @@
 
 /* The subroutine calls in the .init and .fini sections create literal
    pools which must be jumped around....  */
-#define FORCE_CODE_SECTION_ALIGN	asm ("br 1f ; .literals ; 1:");
+/*#define FORCE_CODE_SECTION_ALIGN	asm ("br 1f ; .literals ; 1:");*/
 
 #undef  CTORS_SECTION_ASM_OP
 #define CTORS_SECTION_ASM_OP	"\t.section\t.ctors,\"aw\""
