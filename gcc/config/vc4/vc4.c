@@ -903,7 +903,11 @@ vc4_function_value (const_tree valtype, const_tree func ATTRIBUTE_UNUSED,
 {
   machine_mode mode;
 
-  mode = TYPE_MODE(valtype);
+  mode = TYPE_MODE (valtype);
+
+  if (INTEGRAL_TYPE_P (valtype) && GET_MODE_CLASS (mode) == MODE_INT
+      && GET_MODE_SIZE (mode) < 4)
+    mode = SImode;
 
   return gen_rtx_REG (mode, FIRST_RET_REG);
 }

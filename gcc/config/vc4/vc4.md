@@ -330,26 +330,21 @@
 ;; These ALU instructions are weird and so need special-cased patterns.
 
 (define_insn "subsi3"
-  [
-    (set
-      (match_operand:SI 0 "register_operand" "=f,f,f,f,r,r,r,r,r")
-      (minus:SI
-        (match_operand:SI 1 "register_operand" "0,I,0,f,r,I,0,i,r")
-        (match_operand:SI 2 "nonmemory_operand" "I,0,f,0,I,0,i,0,r")
-      )
-    )
-  ]
+  [(set (match_operand:SI 0 "register_operand"   "=f,f,f,f,r,r,r,r,r")
+	(minus:SI
+	  (match_operand:SI 1 "register_operand"  "0,I,0,f,r,I,0,i,r")
+          (match_operand:SI 2 "nonmemory_operand" "I,0,f,0,I,r,i,0,r")))]
   ""
   "@
-  	sub %0, #%2 ; fast smallint
-	rsub %0, #%1 ; fast smallint
-  	sub %0, %2 ; fast reg
-	rsub %0, %1 ; fast smallint
-  	sub %0, %1, #%2 ; slow smallint
-  	rsub %0, %1, #%1 ; slow smallint
-  	sub %0, #%2 ; largeint 2op
-  	rsub %0, #%1 ; largeint 2op
-  	sub %0, %1, %2"
+   sub %0, #%2 ; fast smallint
+   rsub %0, #%1 ; fast smallint
+   sub %0, %2 ; fast reg
+   rsub %0, %1 ; fast smallint
+   sub %0, %1, #%2 ; slow smallint
+   rsub %0, %2, #%1 ; slow smallint
+   sub %0, #%2 ; largeint 2op
+   rsub %0, #%1 ; largeint 2op
+   sub %0, %1, %2"
   [(set_attr "length" "2,2,2,2,4,4,6,6,4")]
 )
 
@@ -508,7 +503,7 @@
     )
   ]
   ""
-  "flts %0, %1, sasr #0"
+  "flts %0, %1; sasr #0 -- assembler workaround"
   [(set_attr "length" "4")]
 )
 
@@ -522,7 +517,7 @@
     )
   ]
   ""
-  "fltu %0, %1, sasr #0"
+  "fltu %0, %1; sasr #0 -- assembler workaround"
   [(set_attr "length" "4")]
 )
 
