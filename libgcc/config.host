@@ -1303,6 +1303,7 @@ vax-*-netbsdelf*)
 vax-*-openbsd*)
 	;;
 vc4-*-elf)
+	tmake_file="${tmake_file} t-softfp-sfdf t-softfp"
 	;;
 visium-*-elf*)
         extra_parts="$extra_parts crtbegin.o crtend.o crti.o crtn.o"

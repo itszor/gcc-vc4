@@ -703,6 +703,9 @@ case "${target}" in
     # for explicit misaligned loads.
     noconfigdirs="$noconfigdirs target-libssp"
     ;;
+  vc4-*)
+    noconfigdirs="$noconfigdirs target-libssp"
+    ;;
   visium-*-*)
     # No hosted I/O support.
     noconfigdirs="$noconfigdirs target-libssp"

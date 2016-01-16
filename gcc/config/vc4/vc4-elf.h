@@ -54,6 +54,10 @@
   while (0)
 
 
+#undef LIB_SPEC
+//#define LIB_SPEC "--start-group -lc -lgloss --end-group"
+#define LIB_SPEC "-lc"
+
 #undef  STARTFILE_SPEC
 #define STARTFILE_SPEC "crt0.o%s crti.o%s crtbegin.o%s"
 
@@ -62,7 +66,7 @@
    should be done in the linker script - but I have not worked out how
    to specify the location of a linker script in a gcc command line yet.  */
 #undef  ENDFILE_SPEC
-#define ENDFILE_SPEC  "%{!mno-lsim:-lsim} crtend.o%s crtn.o%s"
+#define ENDFILE_SPEC  "crtend.o%s crtn.o%s"
 
 /* The subroutine calls in the .init and .fini sections create literal
    pools which must be jumped around....  */
