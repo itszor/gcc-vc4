@@ -100,32 +100,44 @@ vc4_regno_reg_class[FIRST_PSEUDO_REGISTER] =
   AFP_REG, SFP_REG, CC_REGS			/* ?ap, ?fp, ?cc */
 };
 
-/*
- * The stack frame layout we're going to use looks like follows.
- * hi   incoming_params
- *      ================== ?ap
- *      callee_saves
- *      ------------------
- *      local_vars
- *      local_vars_padding
- *      ------------------ fp, ?fp
- *      outgoing_params
- * lo   ------------------ sp
- *
+/* The stack frame layout we're going to use looks like follows.
+
+  hi   ______________________
+       |                    |
+       |  incoming_params   |
+       |____________________|  <-- old stack pointer
+       |                    |
+       |    pretend args    |
+       |____________________|  <-- soft arg pointer
+       |                    |
+       |    callee_saves    |
+       |____________________|
+       |                    |
+       |     local_vars     |
+       | local_vars_padding |
+       |____________________|  <-- hard+soft frame pointers
+       |                    |
+       |   (alloca space)   |
+       |____________________|
+       |                    |
+       |  outgoing_params   |
+  lo   |____________________|  <-- current stack pointer
+ 
  */
-struct GTY (()) machine_function {
-    int callee_saves;
-    int local_vars;
-    int local_vars_padding;
+struct GTY (()) machine_function
+{
+  int callee_saves;
+  int local_vars;
+  int local_vars_padding;
+  int pretend_size;
+  int outgoing_args_size;
 
-    int outgoing_args_size;
+  /* Topmost register which needs to be saved (or 0 if none).  */
+  int topreg;
 
-    /* Topmost register which needs to be saved (or 0 if none). */
-    int topreg;
-
-	/* Does LR need to be saved? */
-	bool lrneedssaving;
-	bool need_frame_pointer;
+  /* Does LR need to be saved?  */
+  bool lrneedssaving;
+  bool need_frame_pointer;
 };
 
 /* Zero initialization is OK for all current fields.  */
@@ -340,6 +352,7 @@ static int current_function_anonymous_args;
 /* Calculates the offset needed to convert accesses to the specified register
    to instead be an access to the stack pointer.  */
 
+#if 0
 static int
 register_offset (struct machine_function *offsets, int reg)
 {
@@ -367,6 +380,7 @@ register_offset (struct machine_function *offsets, int reg)
 
   return offset;
 }
+#endif
 
 /* Implements the macro INITIAL_ELIMINATION_OFFSET. Returns the offset
    between the two specified registers.  */
@@ -375,14 +389,46 @@ int
 vc4_initial_elimination_offset (int from, int to)
 {
   struct machine_function *offsets = vc4_compute_frame ();
-  int diff;
+  /*int diff;
 
-  diff = register_offset (offsets, to) - register_offset (offsets, from);
+  diff = register_offset (offsets, to) - register_offset (offsets, from);*/
 
   /*fprintf (stderr, "eliminating %s to %s: diff = %d\n", reg_names[from],
 	   reg_names[to], diff);*/
 
-  return diff;
+  if (from == ARG_POINTER_REGNUM)
+    {
+      switch (to)
+	{
+	case FRAME_POINTER_REGNUM:
+	case HARD_FRAME_POINTER_REGNUM:
+	  return offsets->callee_saves + offsets->local_vars
+		 + offsets->local_vars_padding;
+
+	case STACK_POINTER_REGNUM:
+	  return offsets->callee_saves + offsets->local_vars
+		 + offsets->local_vars_padding + offsets->outgoing_args_size;
+
+	default:
+	  gcc_unreachable ();
+	}
+    }
+  else if (from == FRAME_POINTER_REGNUM)
+    {
+      switch (to)
+	{
+	case HARD_FRAME_POINTER_REGNUM:
+	  return 0;
+
+	case STACK_POINTER_REGNUM:
+	  return offsets->outgoing_args_size;
+
+	default:
+	  gcc_unreachable ();
+	}
+    }
+  else
+    gcc_unreachable ();
 }
 
 bool
@@ -414,41 +460,16 @@ num_arg_regs (machine_mode mode, const_tree type)
   return ROUND_ADVANCE (size);
 }
 
-/*
- * Keep track of some information about varargs for the prolog.  
- */
+/* Keep track of some information about varargs for the prolog.  */
 
 static void
-vc4_setup_incoming_varargs(cumulative_args_t args_so_far_v,
-                           machine_mode mode, tree type,
-                           int *ptr_pretend_size ATTRIBUTE_UNUSED,
-                           int second_time ATTRIBUTE_UNUSED)
+vc4_setup_incoming_varargs (cumulative_args_t args_so_far_v,
+                            machine_mode mode, tree type,
+                            int *ptr_pretend_size,
+                            int second_time ATTRIBUTE_UNUSED)
 {
-    CUMULATIVE_ARGS *args_so_far = get_cumulative_args(args_so_far_v);
-
-    current_function_anonymous_args = 1;
-
-    /*
-     * We need to know how many argument registers are used before the
-     * varargs start, so that we can push the remaining argument registers 
-     * during the prologue.  
-     */
-    number_of_regs_before_varargs =
-        *args_so_far + num_arg_regs(mode, type);
-
-    /*
-     * There is a bug somewhere in the arg handling code. Until I can find 
-     * it this workaround always pushes the last named argument onto the
-     * stack.  
-     */
-    number_of_regs_before_varargs = *args_so_far;
-
-    /*
-     * The last named argument may be split between argument registers and 
-     * the stack.  Allow for this here.  
-     */
-    if (number_of_regs_before_varargs > NPARM_REGS)
-        number_of_regs_before_varargs = NPARM_REGS;
+  CUMULATIVE_ARGS *args_so_far = get_cumulative_args (args_so_far_v);
+  *ptr_pretend_size = (6 - *args_so_far) * UNITS_PER_WORD;
 }
 
 /*
@@ -470,9 +491,10 @@ vc4_compute_frame (void)
 
   offsets->need_frame_pointer = frame_pointer_needed;
   offsets->outgoing_args_size = crtl->outgoing_args_size;
+  offsets->pretend_size = crtl->args.pretend_args_size;
 
   /* Padding needed for each element of the frame.  */
-  offsets->local_vars = get_frame_size();
+  offsets->local_vars = get_frame_size ();
 
   /* Align to the stack alignment.  */
   padding_locals = offsets->local_vars % stack_alignment;
@@ -507,6 +529,7 @@ vc4_target_asm_function_prologue (FILE *file,
 {
   struct machine_function *offsets = vc4_compute_frame ();
 
+  fprintf (file, "\t; pretend size = %d bytes\n", offsets->pretend_size);
   fprintf (file, "\t; callee saves = %d bytes\n", offsets->callee_saves);
   fprintf (file, "\t; local vars = %d+%d bytes\n", offsets->local_vars,
 	   offsets->local_vars_padding);
@@ -816,7 +839,23 @@ vc4_expand_prologue (void)
   struct machine_function *offsets = vc4_compute_frame ();
   
   pushlr = offsets->lrneedssaving;
-  
+
+  if (offsets->pretend_size > 0)
+    {
+      int regno, offset = 0;
+      insn = emit_insn (gen_addsi3 (sp, sp, GEN_INT (-offsets->pretend_size)));
+      RTX_FRAME_RELATED_P (insn) = 1;
+      for (offset = 0, regno = 6 - offsets->pretend_size / UNITS_PER_WORD;
+	   regno < 6;
+	   regno++, offset += UNITS_PER_WORD)
+	{
+	  insn = emit_move_insn (gen_rtx_MEM (SImode, plus_constant (Pmode, sp,
+							offset)),
+				 gen_rtx_REG (SImode, regno));
+	  RTX_FRAME_RELATED_P (insn) = 1;
+	}
+    }
+
   if (offsets->topreg > 0)
     insn = vc4_emit_push (R6_REG, offsets->topreg, pushlr);
   else if (pushlr)
@@ -870,13 +909,13 @@ vc4_expand_epilogue (void)
   pushlr = offsets->lrneedssaving;
   
   sp_adjust = offsets->local_vars + offsets->local_vars_padding
-	      + offsets->outgoing_args_size;
+	      + offsets->outgoing_args_size + offsets->pretend_size;
 
   if (offsets->need_frame_pointer)
-    gen_addsi3 (sp, fp, GEN_INT (offsets->local_vars
-				 + offsets->local_vars_padding));
+    emit_insn (gen_addsi3 (sp, fp, GEN_INT (offsets->local_vars
+					    + offsets->local_vars_padding)));
   else if (sp_adjust > 0)
-    gen_addsi3 (sp, sp, GEN_INT (sp_adjust));
+    emit_insn (gen_addsi3 (sp, sp, GEN_INT (sp_adjust)));
   
   if (offsets->topreg > 0)
     vc4_emit_pop (R6_REG, offsets->topreg, pushlr);
@@ -1196,6 +1235,20 @@ vc4_short_form_addr_p (machine_mode mode, rtx x, bool strict_p)
     return true;
 
   return false;
+}
+
+bool
+vc4_long_form_addr_p (machine_mode mode, rtx x, bool strict_p)
+{
+  if (CONSTANT_P (x))
+    return GET_CODE (x) == SYMBOL_REF
+           || GET_CODE (x) == LABEL_REF
+	   || (GET_CODE (x) == CONST
+	       && GET_CODE (XEXP (x, 0)) == PLUS
+	       && (GET_CODE (XEXP (XEXP (x, 0), 0)) == SYMBOL_REF
+		   || GET_CODE (XEXP (XEXP (x, 0), 0)) == LABEL_REF));
+
+  return vc4_legitimate_address_p (mode, x, strict_p);
 }
 
 /*

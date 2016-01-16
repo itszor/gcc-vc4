@@ -77,15 +77,15 @@
 ;; --- Generic moves --------------------------------------------------------
 
 (define_insn "*mov<mode>_insn"
-  [(set (match_operand:QHSI 0 "nonimmediate_operand" "=f,f,r,r,r, f,r,Us,m")
-	(match_operand:QHSI 1 "general_operand"	      "I,f,I,i,r,Us,m, f,r"))]
+  [(set (match_operand:QHSI 0 "nonimmediate_operand" "=f,f,r,r,r, f,r, Us,Ul")
+	(match_operand:QHSI 1 "general_operand"	      "I,f,I,i,r,Us,Ul, f, r"))]
   ""
   "@
   mov %0, #%1\t; fast
   mov %0, %1\t; fast
   mov %0, #%1\t; slow smallint
   mov %0, #%1\t; largeint
-  mov %0, %0, %1\t; slow
+  mov %0, %1\t; slow
   ld<suffix> %0, %1\t;short form
   ld<suffix> %0, %1\t;long form
   st<suffix> %1, %0\t;short form
@@ -248,7 +248,7 @@
     (rotate "ror")
     (ior "or")
     (lshiftrt "lsr")
-    (ashift "lsl")
+    (ashift "shl")
     (ashiftrt "asr")
   ]
 )
@@ -325,6 +325,16 @@
   [(set_attr "length" "4,6,4")]
 )
 
+(define_insn "one_cmplsi2"
+  [(set (match_operand:SI 0 "register_operand"        "=f,r")
+	(not:SI (match_operand:SI 1 "register_operand" "f,r")))]
+  ""
+  "@
+  not %0,%1
+  not %0,%1"
+  [(set_attr "length" "2,4")]
+)
+
 ;; --- Special-cased arithmetic ---------------------------------------------
 
 ;; These ALU instructions are weird and so need special-cased patterns.
@@ -360,8 +370,8 @@
   ]
   ""
   "@
-  	divss %0, %1, %2
-  	divss %0, %1, #%2"
+  	div.ss %0, %1, %2
+  	div.ss %0, %1, #%2"
   [(set_attr "length" "4,4")]
 )
 
@@ -377,8 +387,8 @@
   ]
   ""
   "@
-  	divuu %0, %1, %2
-  	divuu %0, %1, #%2"
+  	div.uu %0, %1, %2
+  	div.uu %0, %1, #%2"
   [(set_attr "length" "4,4")]
 )
 
@@ -459,7 +469,7 @@
     )
   ]
   ""
-  "<fpu_list_2op:fpu_opcode> %0, %1, %1"
+  "<fpu_list_2op:fpu_opcode> %0, %1"
   [(set_attr "length" "4")]
 )
 
@@ -475,23 +485,23 @@
     )
   ]
   ""
-  "ftrunc %0, %1 ; sasl #0"
+  "ftrunc %0, %1, sasl #0"
   [(set_attr "length" "4")]
 )
 
-(define_insn "fixuns_truncsfsi2"
-  [
-    (set
-      (match_operand:SI 0 "register_operand" "=r")
-      (unsigned_fix:SI
-	(match_operand:SF 1 "register_operand" "r")
-      )
-    )
-  ]
-  ""
-  "ftrunc %0, %1; sasl #0"
-  [(set_attr "length" "4")]
-)
+;(define_insn "fixuns_truncsfsi2"
+;  [
+;    (set
+;      (match_operand:SI 0 "register_operand" "=r")
+;      (unsigned_fix:SI
+;	(match_operand:SF 1 "register_operand" "r")
+;      )
+;    )
+;  ]
+;  ""
+;  "ftrunc %0, %1; sasl #0"
+;  [(set_attr "length" "4")]
+;)
 
 (define_insn "floatsisf2"
   [
@@ -503,7 +513,7 @@
     )
   ]
   ""
-  "flts %0, %1; sasr #0 -- assembler workaround"
+  "flts %0, %1, sasr #0"
   [(set_attr "length" "4")]
 )
 
@@ -517,7 +527,7 @@
     )
   ]
   ""
-  "fltu %0, %1; sasr #0 -- assembler workaround"
+  "fltu %0, %1, sasr #0"
   [(set_attr "length" "4")]
 )
 
@@ -818,8 +828,8 @@
   "@
   	cmp %0, %1 ; fast
 	cmp %0, #%1 ; fast
-	cmp %0, r0, %1
-	cmp %0, r0, #%1 ; assembler workaround
+	cmp %0, %1
+	cmp %0, #%1
 	cmp %0, #%1 ; largeint"
   [(set_attr "length" "2,2,4,4,6")]
 )
@@ -835,7 +845,7 @@
     )
   ]
   ""
-  "fcmp %0, %1, %1"
+  "fcmp %0, %1"
   [(set_attr "length" "4")]
 )
 

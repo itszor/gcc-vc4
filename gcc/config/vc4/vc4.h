@@ -40,8 +40,8 @@
   while (0)
 
 /* We don't have a -lg library, so don't put it in the list.  */
-#undef	LIB_SPEC
-#define LIB_SPEC "%{!shared: %{!p:%{!pg:-lc}}%{p:-lc_p}%{pg:-lc_p}}"
+/*#undef	LIB_SPEC
+#define LIB_SPEC "%{!shared: %{!p:%{!pg:-lc}}%{p:-lc_p}%{pg:-lc_p}}"*/
 
 /* The ability to have 4 byte alignment is being suppressed for now.
    If this ability is reenabled, you must disable the definition below
@@ -73,7 +73,7 @@
 
 /* The size of various important data types (in bits). */
 #define FLOAT_TYPE_SIZE 32
-#define DOUBLE_TYPE_SIZE 32
+#define DOUBLE_TYPE_SIZE 64
 #define LONG_LONG_TYPE_SIZE 64
 
 /* Allocation boundary (in *bits*) for storing arguments in argument list.  */
@@ -81,9 +81,6 @@
 
 /* Boundary (in *bits*) on which stack pointer should be aligned.  */
 #define STACK_BOUNDARY (TARGET_8ALIGN ? 64 : 32)
-
-/* Largest increment in UNITS we allow the stack to grow in a single operation.  */
-#define STACK_UNITS_MAXSTEP 4096
 
 /* Allocation boundary (in *bits*) for the code of a function.  */
 #define FUNCTION_BOUNDARY 16
@@ -173,10 +170,10 @@ enum {
 
 
 #undef PC_REGNUM /* This machine has no user-accessible program counter. */
-#define STACK_POINTER_REGNUM SP_REG
-#define FRAME_POINTER_REGNUM FP_REG /* virtual frame pointer */
-#define HARD_FRAME_POINTER_REGNUM R6_REG /* real frame pointer */
-#define ARG_POINTER_REGNUM AP_REG /* virtual argument pointer */
+#define STACK_POINTER_REGNUM 25 /* SP_REG */
+#define FRAME_POINTER_REGNUM 33 /* FP_REG */ /* virtual frame pointer */
+#define HARD_FRAME_POINTER_REGNUM 6 /* R6_REG */ /* real frame pointer */
+#define ARG_POINTER_REGNUM 32 /* AP_REG */ /* virtual argument pointer */
 
 /* The assembler's names for the registers.  RFP need not always be used as
    the Real framepointer; it can also be used as a normal general register.
@@ -379,11 +376,13 @@ extern const enum reg_class vc4_regno_reg_class[FIRST_PSEUDO_REGISTER];
    makes the stack pointer a smaller address.  */
 #define STACK_GROWS_DOWNWARD 1
 
+#define FRAME_GROWS_DOWNWARD 0
+
 /* Offset within stack frame to start allocating local variables at.
    If FRAME_GROWS_DOWNWARD, this is the offset to the END of the
    first local allocated.  Otherwise, it is the offset to the BEGINNING
    of the first local allocated.  */
-#define STARTING_FRAME_OFFSET  0
+#define STARTING_FRAME_OFFSET 0
 
 /* If defined, the maximum amount of space required for outgoing arguments
    will be computed and placed into the variable
