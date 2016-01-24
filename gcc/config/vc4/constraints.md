@@ -45,11 +45,10 @@
   (and (match_code "const_int")
        (match_test "IN_RANGE (ival, -1024, 1023)")))
 
-;(define_constraint "M"
-;  "An unsigned integer in the range 0 to 60, used by the short-form memory
-;   ops."
-;  (and (match_code "const_int")
-;       (match_test "IN_RANGE (ival, 0, 60)")))
+(define_constraint "M"
+  "A signed integer in the range -32768 to 32767, used by 32-bit dyadic ALU ops."
+  (and (match_code "const_int")
+       (match_test "IN_RANGE (ival, -32768, 32767)")))
 
 (define_memory_constraint "Us"
   "A memory operand suitable for short-form memory ops."
