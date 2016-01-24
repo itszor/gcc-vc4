@@ -195,134 +195,134 @@
 
 ;; --- Generic arithmetic ---------------------------------------------------
 
-;; A number of the VC4 ALU instructions follow a common form, which means
-;; we can generate the patterns for them algorithmically.
+; Here:
+;   "I" could perhaps be "J" (6-bit signed vs. 5-bit unsigned immediates).
+;   LEA forms could be explicitly supported.
+;   32-bit dyadic (16-bit immediate) ops could be added.
+;   Immediate subtract forms could be added.
+;   Shifted immediate forms could be added.
 
-;; Fast and slow ALU instructions. (They must not overlap.)
-
-(define_code_iterator alu_fast
-  [
-    plus
-    mult
-    xor
-    lshiftrt
-    ashift
-    ashiftrt
-  ]
-)
-
-(define_code_iterator alu_slow
-  [
-    and
-    rotate
-    ior
-  ]
-)
-
-;; Mappings from insn names to the RTL node that actually does it.
-
-(define_code_attr alu_insn
-  [
-    (plus "addsi3")
-    (mult "mulsi3")
-    (xor "xorsi3")
-    (minus "subsi3")
-    (and "andsi3")
-    (rotate "rotrsi3")
-    (ior "iorsi3")
-    (lshiftrt "lshrsi3")
-    (ashift "ashlsi3")
-    (ashiftrt "ashrsi3")
-  ]
-)
-
-;; Mappings from insn names to the VC4 opcode that implements it.
-
-(define_code_attr alu_opcode
-  [
-    (plus "add")
-    (mult "mul")
-    (xor "eor")
-    (minus "sub")
-    (and "and")
-    (rotate "ror")
-    (ior "or")
-    (lshiftrt "lsr")
-    (ashift "shl")
-    (ashiftrt "asr")
-  ]
-)
-
-;; Expand all ALU instructions.
-
-(define_expand "<alu_fast:alu_insn>"
-  [
-    (set
-      (match_operand:SI 0 "register_operand" "")
-      (alu_fast:SI
-	(match_operand:SI 1 "register_operand" "")
-	(match_operand:SI 2 "nonmemory_operand" "")
-      )
-    )
-  ]
-  ""
-  {
-  }
-)
-
-(define_expand "<alu_slow:alu_insn>"
-  [
-    (set
-      (match_operand:SI 0 "register_operand" "")
-      (alu_slow:SI
-	(match_operand:SI 1 "register_operand" "")
-	(match_operand:SI 2 "nonmemory_operand" "")
-      )
-    )
-  ]
-  ""
-  {
-  }
-)
-
-;; Actually generate the code for the ALU instructions.
-
-(define_insn "*vc4_<alu_fast:alu_insn>_fast"
-  [
-    (set
-      (match_operand:SI 0 "register_operand" "=f,f,r,r,r")
-      (alu_fast:SI
-	(match_operand:SI 1 "register_operand" "0,0,r,0,r")
-	(match_operand:SI 2 "nonmemory_operand" "I,f,I,i,r")
-      )
-    )
-  ]
+(define_insn "addsi3"
+  [(set (match_operand:SI 0 "register_operand"          "=f,f,r,r,r,r")
+	(plus:SI (match_operand:SI 1 "register_operand"  "0,0,r,r,0,r")
+		 (match_operand:SI 2 "nonmemory_operand" "f,I,r,I,i,i")))]
   ""
   "@
-  	<alu_fast:alu_opcode> %0, #%2 ; fast smallint
-  	<alu_fast:alu_opcode> %0, %2 ; fast reg
-  	<alu_fast:alu_opcode> %0, %1, #%2 ; slow smallint
-  	<alu_fast:alu_opcode> %0, #%2 ; largeint 2op
-  	<alu_fast:alu_opcode> %0, %1, %2"
-  [(set_attr "length" "2,2,4,6,4")]
+  add %0,%2
+  add %0,#%2
+  add %0,%1,%2
+  add %0,%1,#%2
+  add %0,#%2
+  add %0,%1,#%2"
+  [(set_attr "length" "2,2,4,4,6,6")]
 )
 
-(define_insn "*vc4_<alu_slow:alu_insn>_slow"
-  [
-    (set
-      (match_operand:SI 0 "register_operand" "=r,r,r")
-      (alu_slow:SI
-	(match_operand:SI 1 "register_operand" "r,0,r")
-	(match_operand:SI 2 "nonmemory_operand" "I,i,r")
-      )
-    )
-  ]
+(define_insn "ashlsi3"
+  [(set (match_operand:SI 0 "register_operand"            "=f,f,r,r")
+	(ashift:SI (match_operand:SI 1 "register_operand"  "0,0,r,r")
+		   (match_operand:SI 2 "nonmemory_operand" "f,I,r,I")))]
   ""
   "@
-  	<alu_slow:alu_opcode> %0, %1, #%2
-  	<alu_slow:alu_opcode> %0, #%2 ; largeint 2op
-  	<alu_slow:alu_opcode> %0, %1, %2"
-  [(set_attr "length" "4,6,4")]
+  shl %0,%2
+  shl %0,#%2
+  shl %0,%1,%2
+  shl %0,%1,#%2"
+  [(set_attr "length" "2,2,4,4")]
+)
+
+(define_insn "ashrsi3"
+  [(set (match_operand:SI 0 "register_operand"              "=f,f,r,r")
+	(ashiftrt:SI (match_operand:SI 1 "register_operand"  "0,0,r,r")
+		     (match_operand:SI 2 "nonmemory_operand" "f,I,r,I")))]
+  ""
+  "@
+  asr %0,%2
+  asr %0,#%2
+  asr %0,%1,%2
+  asr %0,%1,#%2"
+  [(set_attr "length" "2,2,4,4")]
+)
+
+(define_insn "lshrsi3"
+  [(set (match_operand:SI 0 "register_operand"              "=f,f,r,r")
+	(lshiftrt:SI (match_operand:SI 1 "register_operand"  "0,0,r,r")
+		     (match_operand:SI 2 "nonmemory_operand" "f,I,r,I")))]
+  ""
+  "@
+  lsr %0,%2
+  lsr %0,#%2
+  lsr %0,%1,%2
+  lsr %0,%1,#%2"
+  [(set_attr "length" "2,2,4,4")]
+)
+
+(define_insn "rotrsi3"
+  [(set (match_operand:SI 0 "register_operand"              "=f,r,r")
+	(rotatert:SI (match_operand:SI 1 "register_operand"  "0,r,r")
+		     (match_operand:SI 2 "nonmemory_operand" "f,r,I")))]
+  ""
+  "@
+  ror %0,%2
+  ror %0,%1,%2
+  ror %0,%1,#%2"
+  [(set_attr "length" "2,4,4")]
+)
+
+(define_insn "mulsi3"
+  [(set (match_operand:SI 0 "register_operand"          "=f,f,r,r")
+        (mult:SI (match_operand:SI 1 "register_operand"  "0,0,r,r")
+                 (match_operand:SI 2 "nonmemory_operand" "f,I,r,I")))]
+  ""
+  "@
+  mul %0,%2
+  mul %0,#%2
+  mul %0,%1,%2
+  mul %0,%1,#%2"
+  [(set_attr "length" "2,2,4,4")]
+)
+
+; TODO: Add BCHG immediate.
+
+(define_insn "xorsi3"
+  [(set (match_operand:SI 0 "register_operand"         "=f,r,r")
+        (xor:SI (match_operand:SI 1 "register_operand"  "0,r,r")
+                (match_operand:SI 2 "nonmemory_operand" "f,r,I")))]
+  ""
+  "@
+  eor %0,%2
+  eor %0,%1,%2
+  eor %0,%1,#%2"
+  [(set_attr "length" "2,4,4")]
+)
+
+; TODO: Add BCLR immediate, BIC immediate.
+
+(define_insn "andsi3"
+  [(set (match_operand:SI 0 "register_operand"         "=f,f,r,r")
+        (and:SI (match_operand:SI 1 "register_operand"  "0,0,r,r")
+                (match_operand:SI 2 "nonmemory_operand" "f,I,r,I")))]
+  ""
+  "@
+  and %0,%2
+  and %0,#%2
+  and %0,%1,%2
+  and %0,%1,#%2"
+  [(set_attr "length" "2,2,4,4")]
+)
+
+; TODO: Add BSET immediate.
+
+(define_insn "iorsi3"
+  [(set (match_operand:SI 0 "register_operand"         "=f,f,r,r")
+        (ior:SI (match_operand:SI 1 "register_operand"  "0,0,r,r")
+                (match_operand:SI 2 "nonmemory_operand" "f,I,r,I")))]
+  ""
+  "@
+  or %0,%2
+  or %0,#%2
+  or %0,%1,%2
+  or %0,%1,#%2"
+  [(set_attr "length" "2,2,4,4")]
 )
 
 (define_insn "one_cmplsi2"
