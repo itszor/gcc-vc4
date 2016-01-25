@@ -469,7 +469,8 @@ vc4_setup_incoming_varargs (cumulative_args_t args_so_far_v,
                             int second_time ATTRIBUTE_UNUSED)
 {
   CUMULATIVE_ARGS *args_so_far = get_cumulative_args (args_so_far_v);
-  *ptr_pretend_size = (6 - *args_so_far) * UNITS_PER_WORD;
+  if (*args_so_far < 6)
+    *ptr_pretend_size = (6 - *args_so_far) * UNITS_PER_WORD;
 }
 
 /*
@@ -709,8 +710,11 @@ vc4_emit_multi_reg_pop (rtx par)
 
   gcc_assert (have_return == pc_included);
   gcc_assert (base_reg == SP_REG);
+  /* Here, LR_REG is allowed as a pseudo-instruction to aid epilogue expansion
+     for functions with pretend arguments.  It may be better to handle this
+     elsewhere?  */
   gcc_assert (lo_reg == R0_REG || lo_reg == R6_REG || lo_reg == R16_REG
-	      || lo_reg == GP_REG
+	      || lo_reg == GP_REG || lo_reg == LR_REG
 	      || (lo_reg == -1 && hi_reg == -1 && pc_included));
   gcc_assert (hi_reg >= lo_reg
 	      || (lo_reg == -1 && hi_reg == -1 && pc_included));
@@ -909,20 +913,34 @@ vc4_expand_epilogue (void)
   pushlr = offsets->lrneedssaving;
   
   sp_adjust = offsets->local_vars + offsets->local_vars_padding
-	      + offsets->outgoing_args_size + offsets->pretend_size;
+	      + offsets->outgoing_args_size;
 
   if (offsets->need_frame_pointer)
     emit_insn (gen_addsi3 (sp, fp, GEN_INT (offsets->local_vars
 					    + offsets->local_vars_padding)));
   else if (sp_adjust > 0)
     emit_insn (gen_addsi3 (sp, sp, GEN_INT (sp_adjust)));
-  
-  if (offsets->topreg > 0)
-    vc4_emit_pop (R6_REG, offsets->topreg, pushlr);
-  else if (pushlr)
-    vc4_emit_pop (-1, -1, true);
-  
-  if (!pushlr)
+
+  if (offsets->pretend_size == 0)
+    {
+      if (offsets->topreg > 0)
+        vc4_emit_pop (R6_REG, offsets->topreg, pushlr);
+      else if (pushlr)
+        vc4_emit_pop (-1, -1, true);
+    }
+  else
+    {
+      gcc_assert (pushlr);
+
+      if (offsets->topreg > 0)
+        vc4_emit_pop (R6_REG, offsets->topreg, false);
+
+      vc4_emit_pop (LR_REG, LR_REG, false);
+
+      emit_insn (gen_addsi3 (sp, sp, GEN_INT (offsets->pretend_size)));
+    }
+
+  if (!pushlr || offsets->pretend_size > 0)
     emit_jump_insn (gen_vc4_return ());
 }
 

@@ -269,60 +269,64 @@
 )
 
 (define_insn "mulsi3"
-  [(set (match_operand:SI 0 "register_operand"          "=f,f,r,r")
-        (mult:SI (match_operand:SI 1 "register_operand"  "0,0,r,r")
-                 (match_operand:SI 2 "nonmemory_operand" "f,I,r,I")))]
+  [(set (match_operand:SI 0 "register_operand"          "=f,f,r,r,r")
+        (mult:SI (match_operand:SI 1 "register_operand"  "0,0,r,r,0")
+                 (match_operand:SI 2 "nonmemory_operand" "f,I,r,I,i")))]
   ""
   "@
   mul %0,%2
   mul %0,#%2
   mul %0,%1,%2
-  mul %0,%1,#%2"
-  [(set_attr "length" "2,2,4,4")]
+  mul %0,%1,#%2
+  mul %0,#%2"
+  [(set_attr "length" "2,2,4,4,6")]
 )
 
 ; TODO: Add BCHG immediate.
 
 (define_insn "xorsi3"
-  [(set (match_operand:SI 0 "register_operand"         "=f,r,r")
-        (xor:SI (match_operand:SI 1 "register_operand"  "0,r,r")
-                (match_operand:SI 2 "nonmemory_operand" "f,r,I")))]
+  [(set (match_operand:SI 0 "register_operand"         "=f,r,r,r")
+        (xor:SI (match_operand:SI 1 "register_operand"  "0,r,r,0")
+                (match_operand:SI 2 "nonmemory_operand" "f,r,I,i")))]
   ""
   "@
   eor %0,%2
   eor %0,%1,%2
-  eor %0,%1,#%2"
-  [(set_attr "length" "2,4,4")]
+  eor %0,%1,#%2
+  eor %0,#%2"
+  [(set_attr "length" "2,4,4,6")]
 )
 
 ; TODO: Add BCLR immediate, BIC immediate.
 
 (define_insn "andsi3"
-  [(set (match_operand:SI 0 "register_operand"         "=f,f,r,r")
-        (and:SI (match_operand:SI 1 "register_operand"  "0,0,r,r")
-                (match_operand:SI 2 "nonmemory_operand" "f,I,r,I")))]
+  [(set (match_operand:SI 0 "register_operand"         "=f,f,r,r,r")
+        (and:SI (match_operand:SI 1 "register_operand"  "0,0,r,r,0")
+                (match_operand:SI 2 "nonmemory_operand" "f,I,r,I,i")))]
   ""
   "@
   and %0,%2
   and %0,#%2
   and %0,%1,%2
-  and %0,%1,#%2"
-  [(set_attr "length" "2,2,4,4")]
+  and %0,%1,#%2
+  and %0,#%2"
+  [(set_attr "length" "2,2,4,4,6")]
 )
 
 ; TODO: Add BSET immediate.
 
 (define_insn "iorsi3"
-  [(set (match_operand:SI 0 "register_operand"         "=f,f,r,r")
-        (ior:SI (match_operand:SI 1 "register_operand"  "0,0,r,r")
-                (match_operand:SI 2 "nonmemory_operand" "f,I,r,I")))]
+  [(set (match_operand:SI 0 "register_operand"         "=f,f,r,r,r")
+        (ior:SI (match_operand:SI 1 "register_operand"  "0,0,r,r,0")
+                (match_operand:SI 2 "nonmemory_operand" "f,I,r,I,i")))]
   ""
   "@
   or %0,%2
   or %0,#%2
   or %0,%1,%2
-  or %0,%1,#%2"
-  [(set_attr "length" "2,2,4,4")]
+  or %0,%1,#%2
+  or %0,#%2"
+  [(set_attr "length" "2,2,4,4,6")]
 )
 
 (define_insn "one_cmplsi2"
