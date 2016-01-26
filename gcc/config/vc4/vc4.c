@@ -930,12 +930,11 @@ vc4_expand_epilogue (void)
     }
   else
     {
-      gcc_assert (pushlr);
-
       if (offsets->topreg > 0)
         vc4_emit_pop (R6_REG, offsets->topreg, false);
 
-      vc4_emit_pop (LR_REG, LR_REG, false);
+      if (pushlr)
+        vc4_emit_pop (LR_REG, LR_REG, false);
 
       emit_insn (gen_addsi3 (sp, sp, GEN_INT (offsets->pretend_size)));
     }
