@@ -944,6 +944,42 @@ vc4_expand_epilogue (void)
 }
 
 void
+vc4_asm_trampoline_template (FILE *f)
+{
+  asm_fprintf (f, "\tmov %r, #0x12345678\n", STATIC_CHAIN_REGNUM);
+  /* FIXME: I don't know if this works on the H/W.  */
+  asm_fprintf (f, "\tmov %r, #0x12345678\n", PC_REGNUM);
+}
+
+void
+vc4_trampoline_init (rtx m_tramp, tree fndecl, rtx static_chain)
+{
+  emit_block_move (m_tramp, assemble_trampoline_template (),
+                   GEN_INT (TRAMPOLINE_SIZE), BLOCK_OP_NORMAL);
+
+  /* We have to move by halfwords because insns have 16-bit alignment so we
+     can't use a single 32-bit move.  */
+  rtx mem = adjust_address (m_tramp, HImode, 2);
+  rtx tmp = force_reg (SImode, static_chain);
+  emit_move_insn (mem, gen_lowpart (HImode, tmp));
+  mem = adjust_address (m_tramp, HImode, 4);
+  tmp = gen_rtx_LSHIFTRT (SImode, static_chain, GEN_INT (16));
+  tmp = force_reg (SImode, tmp);
+  emit_move_insn (mem, gen_lowpart (HImode, tmp));
+
+  mem = adjust_address (m_tramp, HImode, 8);
+  rtx fnaddr = XEXP (DECL_RTL (fndecl), 0);
+  tmp = force_reg (SImode, fnaddr);
+  emit_move_insn (mem, gen_lowpart (HImode, tmp));
+  mem = adjust_address (m_tramp, HImode, 10);
+  tmp = gen_rtx_LSHIFTRT (SImode, fnaddr, GEN_INT (16));
+  tmp = force_reg (SImode, tmp);
+  emit_move_insn (mem, gen_lowpart (HImode, tmp));
+
+  /* Hmm, we don't know how to flush the cache.  */
+}
+
+void
 vc4_init_expanders (void)
 {
   init_machine_status = vc4_init_machine_status;
@@ -1329,6 +1365,12 @@ vc4_legitimate_constant_p(machine_mode mode ATTRIBUTE_UNUSED, rtx x)
 
 #undef  TARGET_SETUP_INCOMING_VARARGS
 #define TARGET_SETUP_INCOMING_VARARGS	vc4_setup_incoming_varargs
+
+#undef TARGET_ASM_TRAMPOLINE_TEMPLATE
+#define TARGET_ASM_TRAMPOLINE_TEMPLATE  vc4_asm_trampoline_template
+
+#undef TARGET_TRAMPOLINE_INIT
+#define TARGET_TRAMPOLINE_INIT          vc4_trampoline_init
 
 #undef TARGET_LEGITIMATE_ADDRESS_P
 #define TARGET_LEGITIMATE_ADDRESS_P	vc4_legitimate_address_p

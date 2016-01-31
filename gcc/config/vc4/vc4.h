@@ -169,7 +169,7 @@ enum {
    The values of these macros are register numbers.  */
 
 
-#undef PC_REGNUM /* This machine has no user-accessible program counter. */
+#define PC_REGNUM 31 /* This machine has no user-accessible program counter. */
 #define STACK_POINTER_REGNUM 25 /* SP_REG */
 #define FRAME_POINTER_REGNUM 33 /* FP_REG */ /* virtual frame pointer */
 #define HARD_FRAME_POINTER_REGNUM 6 /* R6_REG */ /* real frame pointer */
@@ -184,7 +184,7 @@ enum {
   "r0",  "r1",  "r2",  "r3",  "r4",  "r5",  "r6",  "r7", \
   "r8",  "r9",  "r10", "r11", "r12", "r13", "r14", "r15", \
   "r16", "r17", "r18", "r19", "r20", "r21", "r22", "r23", \
-  "gp",  "sp",  "lr",  "r27", "r28", "r29", "r30", "r31", \
+  "gp",  "sp",  "lr",  "r27", "r28", "r29", "r30", "pc", \
   "?ap", "?fp", "?cc" \
 }
 
@@ -459,7 +459,7 @@ extern const enum reg_class vc4_regno_reg_class[FIRST_PSEUDO_REGISTER];
 #define TRAMPOLINE_SIZE  12
 
 /* Alignment required for a trampoline in bits.  */
-#define TRAMPOLINE_ALIGNMENT  32
+#define TRAMPOLINE_ALIGNMENT  16
 
 /* Macros to check register numbers against specific register classes.  */
 
