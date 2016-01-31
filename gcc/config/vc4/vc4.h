@@ -174,6 +174,7 @@ enum {
 #define FRAME_POINTER_REGNUM 33 /* FP_REG */ /* virtual frame pointer */
 #define HARD_FRAME_POINTER_REGNUM 6 /* R6_REG */ /* real frame pointer */
 #define ARG_POINTER_REGNUM 32 /* AP_REG */ /* virtual argument pointer */
+#define CC_REGNUM 34
 
 /* The assembler's names for the registers.  RFP need not always be used as
    the Real framepointer; it can also be used as a normal general register.

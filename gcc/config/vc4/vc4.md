@@ -26,14 +26,9 @@
 (include "predicates.md")
 (include "constraints.md")
 
-(define_constants
-  [
-    (GP_REGNO 25)
-    (SP_REGNO 26)
-    (LR_REGNO 27)
-    (CC_REGNO 29)
-  ]
-)
+(define_constants [
+  (CC_REGNO 34)
+])
 
 (define_mode_iterator QHSI [QI HI SI])
 (define_mode_iterator QHI [QI HI])
@@ -695,182 +690,83 @@
 
 ;; --- Conditionals ---------------------------------------------------------
 
-(define_code_iterator condition
-  [
-    ne
-    eq
-    gt
-    gtu
-    lt
-    ltu
-    ge
-    geu
-    le
-    leu
-  ]
-)
-
-(define_code_attr condition_code
-  [
-    (ne "ne")
-    (eq "eq")
-    (gt "gt")
-    (gtu "hi")
-    (lt "lt")
-    (ltu "lo")
-    (ge "ge")
-    (geu "hs")
-    (le "le")
-    (leu "ls")
-  ]
-)
-
 ;; Combined test-and-branch instructions.
 
 (define_expand "cbranchsi4"
-  [
-    (set
-      (reg:CC CC_REGNO)
-      (compare:CC
-	(match_operand 1)
-	(match_operand 2)
-      )
-    )
-    (set
-      (pc)
-      (if_then_else
-        (match_operator 0 "comparison_operator"
-          [
-	    (reg:CC CC_REGNO)
-	    (const_int 0)
-          ]
-        )
-        (label_ref
-          (match_operand 3 "" "")
-        )
-        (pc)
-      )
-    )
-  ]
+  [(set (reg:CC CC_REGNO) (compare:CC
+	                    (match_operand:SI 1 "register_operand" "")
+	                    (match_operand:SI 2 "nonmemory_operand" "")))
+   (set (pc) (if_then_else
+               (match_operator 0 "comparison_operator"
+                 [(reg:CC CC_REGNO) (const_int 0)])
+               (label_ref (match_operand 3 "" ""))
+               (pc)))]
   ""
-  {
-    /* Ensure that comparisons against memory go via a temporary register. */
-    if (GET_CODE(operands[1]) == MEM)
-      operands[1] = force_reg(SImode, operands[1]);
-    if (GET_CODE(operands[2]) == MEM)
-      operands[2] = force_reg(SImode, operands[2]);
-  }
-)
+{
+})
 
 (define_expand "cbranchsf4"
-  [
-    (set
-      (reg:CC CC_REGNO)
-      (compare:CC
-	(match_operand:SF 1 "register_operand")
-	(match_operand:SF 2 "register_operand")
-      )
-    )
-    (set
-      (pc)
-      (if_then_else
-        (match_operator 0 "comparison_operator"
-          [
-	    (reg:CC CC_REGNO)
-	    (const_int 0)
-          ]
-        )
-        (label_ref
-          (match_operand 3 "" "")
-        )
-        (pc)
-      )
-    )
-  ]
+  [(set (reg:CCFP CC_REGNO) (compare:CCFP
+	                      (match_operand:SF 1 "register_operand" "")
+	                      (match_operand:SF 2 "register_operand" "")))
+   (set (pc) (if_then_else
+               (match_operator 0 "ordered_comparison_operator"
+                 [(reg:CCFP CC_REGNO) (const_int 0)])
+               (label_ref (match_operand 3 "" ""))
+               (pc)))]
   ""
-  {}
-)
+{
+})
 
 ;; This is disabled for now because it doesn't understand limited offset range.
 
-(define_insn "*vc4_test_and_branch_<condition:code>"
-  [
-    (set
-      (pc)
-      (if_then_else
-        (condition
-	  (match_operand:SI 0 "register_operand" "f,f")
-	  (match_operand:SI 1 "nonmemory_operand" "f,K")
-        )
-        (label_ref
-          (match_operand 2)
-        )
-        (pc)
-      )
-    )
-  ]
-  "0"
-  "@
-  	b<condition:condition_code> %0, %1, %2
-  	b<condition:condition_code> %0, #%1, %2"
-  [(set_attr "length" "4,4")]
-)
+;(define_insn "*vc4_test_and_branch_<condition:code>"
+;  [(set (pc) (if_then_else
+;               (condition
+;	         (match_operand:SI 0 "register_operand" "f,f")
+;	         (match_operand:SI 1 "nonmemory_operand" "f,K"))
+;               (label_ref (match_operand 2))
+;               (pc)))]
+;  "0"
+;  "@
+;  b<condition:condition_code> %0, %1, %2
+;  b<condition:condition_code> %0, #%1, %2"
+;  [(set_attr "length" "4,4")]
+;)
 
 ;; Separated comparisons.
 
 (define_insn "*vc4_test_si"
-  [
-    (set
-      (reg:CC CC_REGNO)
-      (compare:CC
-        (match_operand:SI 0 "register_operand" "f,f,r,r,r")
-        (match_operand:SI 1 "nonmemory_operand" "f,I,r,I,i")
-      )
-    )
-  ]
+  [(set (reg:CC CC_REGNO)
+        (compare:CC (match_operand:SI 0 "register_operand"  "f,f,r,r,r")
+                    (match_operand:SI 1 "nonmemory_operand" "f,I,r,I,i")))]
   ""
   "@
-  	cmp %0, %1 ; fast
-	cmp %0, #%1 ; fast
-	cmp %0, %1
-	cmp %0, #%1
-	cmp %0, #%1 ; largeint"
+  cmp %0, %1 ; fast
+  cmp %0, #%1 ; fast
+  cmp %0, %1
+  cmp %0, #%1
+  cmp %0, #%1 ; largeint"
   [(set_attr "length" "2,2,4,4,6")]
 )
 
 (define_insn "*vc4_test_sf"
-  [
-    (set
-      (reg:CC CC_REGNO)
-      (compare:CC
-        (match_operand:SF 0 "register_operand" "r")
-        (match_operand:SF 1 "register_operand" "r")
-      )
-    )
-  ]
+  [(set (reg:CCFP CC_REGNO)
+        (compare:CCFP (match_operand:SF 0 "register_operand" "r")
+                      (match_operand:SF 1 "register_operand" "r")))]
   ""
-  "fcmp %0, %1"
+  "fcmp %0,%1"
   [(set_attr "length" "4")]
 )
 
-(define_insn "*vc4_branch_<condition:code>"
-  [
-    (set
-      (pc)
-      (if_then_else
-        (condition
-	  (reg:CC CC_REGNO)
-	  (const_int 0)
-	)
-	(label_ref
-	  (match_operand 0)
-	)
-	(pc)
-      )
-    )
-  ]
+(define_insn "*vc4_branch"
+  [(set (pc)
+        (if_then_else (match_operator 1 "ordered_comparison_operator"
+            [(match_operand 2 "cc_register" "") (const_int 0)])
+          (label_ref (match_operand 0 "" ""))
+          (pc)))]
   ""
-  "b<condition:condition_code> %0"
+  "b%c1 %0"
   [(set_attr "length" "4")]
 )
 

@@ -249,6 +249,81 @@ vc4_print_operand (FILE *stream, rtx x, int code)
         fprintf (asm_out_file, "#" HOST_WIDE_INT_PRINT_DEC, INTVAL (x));
         break;
 
+      case 'c':
+        {
+          machine_mode mode = GET_MODE (XEXP (x, 0));
+          switch (mode)
+            {
+            case CCmode:
+              switch (GET_CODE (x))
+                {
+                case NE:
+                  fputs ("ne", stream);
+                  break;
+                case EQ:
+                  fputs ("eq", stream);
+                  break;
+                case GT:
+                  fputs ("gt", stream);
+                  break;
+                case GE:
+                  fputs ("ge", stream);
+                  break;
+                case LT:
+                  fputs ("lt", stream);
+                  break;
+                case LE:
+                  fputs ("le", stream);
+                  break;
+                case GTU:
+                  fputs ("hi", stream);
+                  break;
+                case GEU:
+                  fputs ("hs", stream);
+                  break;
+                case LTU:
+                  fputs ("lo", stream);
+                  break;
+                case LEU:
+                  fputs ("ls", stream);
+                  break;
+                default:
+                  gcc_unreachable ();
+                }
+              break;
+
+            case CCFPmode:
+              switch (GET_CODE (x))
+                {
+                case NE:
+                  fputs ("ne", stream);
+                  break;
+                case EQ:
+                  fputs ("eq", stream);
+                  break;
+                case GT:
+                  fputs ("gt", stream);
+                  break;
+                case GE:
+                  fputs ("ge", stream);
+                  break;
+                case LT:
+                  fputs ("lt", stream);
+                  break;
+                case LE:
+                  fputs ("le", stream);
+                  break;
+                default:
+                  gcc_unreachable ();
+                }
+              break;
+
+            default:
+              gcc_unreachable ();
+            }
+        }
+        break;
+
       default:
         switch (GET_CODE (x))
           {
