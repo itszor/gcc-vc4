@@ -34,3 +34,7 @@
 {
   return vc4_push_pop_operation_p (op, false, true);
 })
+
+(define_special_predicate "cc_register"
+  (and (match_code "reg")
+       (match_test "REGNO (op) == CC_REGNUM")))
