@@ -617,25 +617,14 @@
 ;; Call a function with no return value.
 
 (define_expand "call"
-  [
-    (call
-      (match_operand 0 "" "")
-	  (match_operand 1 "" "")
-	)
-  ]
+  [(call (match_operand 0 "" "") (match_operand 1 "" ""))]
   ""
   ""
 )
 
 (define_insn "*vc4_simple_call"
-  [
-    (call
-      (mem
-	    (match_operand 0 "immediate_operand" "i")
-      )
-      (match_operand 1 "const_int_operand")
-    )
-  ]
+  [(call (mem (match_operand 0 "immediate_operand" "i"))
+         (match_operand 1 "const_int_operand"))]
   ""
   "bl %0"
 )
@@ -650,31 +639,17 @@
 ;; Call a function *with* a return value.
 
 (define_expand "call_value"
-  [
-	(set
-	  (match_operand 0 "" "")
-	  (call
-	    (match_operand 1 "" "")
-	    (match_operand 2 "" "")
-	  )
-	)
-  ]
+  [(set (match_operand 0 "" "")
+	(call (match_operand 1 "" "")
+	      (match_operand 2 "" "")))]
   ""
   ""
 )
 
 (define_insn "*vc4_value_call"
-  [
-	(set
-	  (match_operand 0 "register_operand" "=r")
-	  (call
-        (mem
-	      (match_operand 1 "immediate_operand" "i")
-        )
-	    (match_operand 2 "const_int_operand")
-	  )
-	)
-  ]
+  [(set (match_operand 0 "register_operand" "=r")
+	(call (mem (match_operand 1 "immediate_operand" "i"))
+	      (match_operand 2 "const_int_operand")))]
   ""
   "bl %1"
 )
@@ -687,6 +662,26 @@
   "bl %1"
   [(set_attr "length" "2")])
 
+(define_expand "untyped_call"
+  [(parallel [(call (match_operand 0 "" "")
+                    (const_int 0))
+              (match_operand 1 "" "")
+              (match_operand 2 "" "")])]
+  ""
+{
+  int i;
+
+  emit_call_insn (gen_call (operands[0], const0_rtx));
+
+  for (i = 0; i < XVECLEN (operands[2], 0); i++)
+    {
+      rtx set = XVECEXP (operands[2], 0, i);
+      emit_move_insn (SET_DEST (set), SET_SRC (set));
+    }
+
+  emit_insn (gen_blockage ());
+  DONE;
+})
 
 ;; --- Conditionals ---------------------------------------------------------
 
