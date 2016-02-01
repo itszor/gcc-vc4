@@ -1306,8 +1306,8 @@ vc4_legitimate_address_p_1 (machine_mode mode ATTRIBUTE_UNUSED, rtx x,
   if (GET_CODE (x) == PLUS
       && vc4_address_register_p (XEXP (x, 0), strict)
       && GET_CODE (XEXP (x, 1)) == CONST_INT
-      && INTVAL (XEXP (x, 1)) >= -0x40000000
-      && INTVAL (XEXP (x, 1)) < 0x40000000)
+      && INTVAL (XEXP (x, 1)) >= -0x4000000
+      && INTVAL (XEXP (x, 1)) < 0x4000000)
     return true;
 
   /* !!! (reg, reg) addressing also appears to be available.  */
