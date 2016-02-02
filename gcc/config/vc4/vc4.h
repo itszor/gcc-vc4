@@ -363,6 +363,9 @@ extern const enum reg_class vc4_regno_reg_class[FIRST_PSEUDO_REGISTER];
 #define CLASS_MAX_NREGS(CLASS, MODE)  \
      (ROUND_ADVANCE (GET_MODE_SIZE (MODE)))
 
+#define HARD_REGNO_RENAME_OK(SRC, DST) \
+  df_regs_ever_live_p (DST)
+
 /* Stack layout; function entry, exit and calling.  */
 
 /* Define the number of register that can hold parameters.

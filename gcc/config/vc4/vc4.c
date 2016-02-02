@@ -589,7 +589,7 @@ vc4_compute_frame (void)
 
   /* Check to see if lr needs saving. */
   offsets->lrneedssaving = !leaf_function_p ()
-				 || df_regs_ever_live_p (LR_REG);
+			   || df_regs_ever_live_p (LR_REG);
 
   offsets->callee_saves = (offsets->lrneedssaving ? 4 : 0);
 
