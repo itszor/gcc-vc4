@@ -85,6 +85,8 @@
 #  define SIZE 252
 #elif defined (__v850__)
 #define SIZE 260
+#elif defined (__vc4__)
+#define SIZE 252
 #elif defined (__mn10300__)
 #define SIZE 252
 #elif defined (__H8300SX__) || defined (__H8300S__) || defined (__H8300H__) || defined (__H8300__) 
