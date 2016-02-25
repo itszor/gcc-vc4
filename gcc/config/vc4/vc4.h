@@ -43,12 +43,6 @@
 /*#undef	LIB_SPEC
 #define LIB_SPEC "%{!shared: %{!p:%{!pg:-lc}}%{p:-lc_p}%{pg:-lc_p}}"*/
 
-/* The ability to have 4 byte alignment is being suppressed for now.
-   If this ability is reenabled, you must disable the definition below
-   *and* edit t-vc4 to enable multilibs for 4 byte alignment code.  */
-#undef TARGET_8ALIGN
-#define TARGET_8ALIGN 1
-
 /* Target machine storage Layout.  */
 
 #define PROMOTE_MODE(MODE,UNSIGNEDP,TYPE)  	\
@@ -80,7 +74,7 @@
 #define PARM_BOUNDARY 32
 
 /* Boundary (in *bits*) on which stack pointer should be aligned.  */
-#define STACK_BOUNDARY (TARGET_8ALIGN ? 64 : 32)
+#define STACK_BOUNDARY 32
 
 /* Allocation boundary (in *bits*) for the code of a function.  */
 #define FUNCTION_BOUNDARY 16
@@ -89,7 +83,7 @@
 #define EMPTY_FIELD_BOUNDARY 32
 
 /* No data type wants to be aligned rounder than this.  */
-#define BIGGEST_ALIGNMENT (TARGET_8ALIGN ? 64 : 32)
+#define BIGGEST_ALIGNMENT 32
 
 /* The best alignment to use in cases where we have a choice.  */
 #define FASTEST_ALIGNMENT 32

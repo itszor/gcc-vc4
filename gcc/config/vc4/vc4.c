@@ -916,8 +916,13 @@ vc4_expand_prologue (void)
   rtx pat = NULL_RTX;
   rtx_insn *insn = 0;
   struct machine_function *offsets = vc4_compute_frame ();
-  
+
   pushlr = offsets->lrneedssaving;
+
+  if (flag_stack_usage_info)
+    current_function_static_stack_size = offsets->pretend_size
+      + offsets->local_vars + offsets->local_vars_padding
+      + offsets->callee_saves + offsets->outgoing_args_size;
 
   if (offsets->pretend_size > 0)
     {
