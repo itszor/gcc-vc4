@@ -803,7 +803,9 @@ vc4_emit_multi_reg_pop (rtx par)
 	  operands[0] = gen_rtx_REG (SImode, lo_reg);
 	  if (pc_included)
             output_asm_insn ("pop %0, pc", operands);
-	  else
+	  else if (lo_reg == LR_REG)
+            output_asm_insn ("ld %0, (sp)++", operands);
+          else
 	    output_asm_insn ("pop %0", operands);
 	  return "";
 	}
