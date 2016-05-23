@@ -545,7 +545,10 @@ extern const enum reg_class vc4_regno_reg_class[FIRST_PSEUDO_REGISTER];
 #define TEXT_SECTION_ASM_OP  "\t.text"
 #define DATA_SECTION_ASM_OP  "\t.data"
 
-#define INCOMING_RETURN_ADDR_RTX gen_rtx_REG (SImode, LR_REG)
+#define RETURN_ADDR_RTX(COUNT, FRAME) \
+  ((COUNT) != 0 ? NULL_RTX : get_hard_reg_initial_val (Pmode, LR_REG))
+
+#define INCOMING_RETURN_ADDR_RTX gen_rtx_REG (Pmode, LR_REG)
 
 /* This is how to output an insn to push a register on the stack.
    It need not be very fast code.  */
