@@ -89,6 +89,8 @@ __aeabi_idiv0 (int return_value)
 #elif defined (__nvptx__)
 /* There isn't even a signal function.  */
 # define DO_TEST 0
+#elif defined (__vc4__)
+# define DO_TEST 0
 #else
 # define DO_TEST 1
 #endif
