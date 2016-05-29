@@ -221,8 +221,8 @@ vc4_print_operand_address (FILE *stream, rtx x)
     case PLUS:
       if (REG_P (XEXP (x, 0))
 	  && GET_CODE (XEXP (x, 1)) == CONST_INT)
-	asm_fprintf (stream, "%d(%r)", (int) INTVAL (XEXP (x, 1)),
-		     REGNO (XEXP (x, 0)));
+	asm_fprintf (stream, "(%r+%d)", REGNO (XEXP (x, 0)),
+                     (int) INTVAL (XEXP (x, 1)));
       else if (REG_P (XEXP (x, 0)) && REG_P (XEXP (x, 1)))
         asm_fprintf (stream, "(%r, %r)", REGNO (XEXP (x, 0)),
 		     REGNO (XEXP (x, 1)));
@@ -718,14 +718,14 @@ vc4_emit_multi_reg_push (rtx par)
   if (lo_reg == hi_reg)
     {
       if (lo_reg == -1 && lr_included)
-	return "push lr";
+	return "stm lr,(--sp)";
       else
         {
 	  operands[0] = gen_rtx_REG (SImode, lo_reg);
 	  if (lr_included)
-            output_asm_insn ("push %0, lr", operands);
+            output_asm_insn ("stm %0, lr, (--sp)", operands);
 	  else
-	    output_asm_insn ("push %0", operands);
+	    output_asm_insn ("stm %0, (--sp)", operands);
 	  return "";
 	}
     }
@@ -734,9 +734,9 @@ vc4_emit_multi_reg_push (rtx par)
       operands[0] = gen_rtx_REG (SImode, lo_reg);
       operands[1] = gen_rtx_REG (SImode, hi_reg);
       if (lr_included)
-        output_asm_insn ("push %0-%1, lr", operands);
+        output_asm_insn ("stm %0-%1, lr, (--sp)", operands);
       else
-	output_asm_insn ("push %0-%1", operands);
+	output_asm_insn ("stm %0-%1, (--sp)", operands);
       return "";
     }
 }
@@ -802,11 +802,11 @@ vc4_emit_multi_reg_pop (rtx par)
         {
 	  operands[0] = gen_rtx_REG (SImode, lo_reg);
 	  if (pc_included)
-            output_asm_insn ("pop %0, pc", operands);
+            output_asm_insn ("ldm %0, pc, (sp++)", operands);
 	  else if (lo_reg == LR_REG)
-            output_asm_insn ("ld %0, (sp)++", operands);
+            output_asm_insn ("ld %0, (sp++)", operands);
           else
-	    output_asm_insn ("pop %0", operands);
+	    output_asm_insn ("ldm %0, (sp++)", operands);
 	  return "";
 	}
     }
@@ -815,9 +815,9 @@ vc4_emit_multi_reg_pop (rtx par)
       operands[0] = gen_rtx_REG (SImode, lo_reg);
       operands[1] = gen_rtx_REG (SImode, hi_reg);
       if (pc_included)
-        output_asm_insn ("pop %0-%1, pc", operands);
+        output_asm_insn ("ldm %0-%1, pc, (sp++)", operands);
       else
-	output_asm_insn ("pop %0-%1", operands);
+	output_asm_insn ("ldm %0-%1, (sp++)", operands);
       return "";
     }
 }
