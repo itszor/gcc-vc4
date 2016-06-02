@@ -797,7 +797,7 @@ vc4_emit_multi_reg_pop (rtx par)
   if (lo_reg == hi_reg)
     {
       if (lo_reg == -1 && pc_included)
-	return "pop pc";
+	return "ldm pc, (sp++)";
       else
         {
 	  operands[0] = gen_rtx_REG (SImode, lo_reg);
