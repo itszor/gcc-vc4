@@ -154,10 +154,13 @@ enum {
     PC_REG = 31, /* The PC is not exposed, but this is useful in pop insns.  */
     AP_REG = 32, /* 32 */
     FP_REG, /* 33 */
-    CC_REG, /* 34 */
-
-    FIRST_PSEUDO_REGISTER
+    CC_REG /* 34 */
 };
+
+/* FIRST_PSEUDO_REGISTER needs to be defined as a preprocessor macro
+   not part of an enum, as the preprocessor needs to make a decission
+   based on this value in gcc/hard-reg-set.h */
+#define FIRST_PSEUDO_REGISTER 35
 
 /* Specify the registers used for certain standard purposes.
    The values of these macros are register numbers.  */
