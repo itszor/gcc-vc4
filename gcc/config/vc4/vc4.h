@@ -456,11 +456,13 @@ extern const enum reg_class vc4_regno_reg_class[FIRST_PSEUDO_REGISTER];
    No definition is equivalent to always zero.  */
 #define EXIT_IGNORE_STACK 0
 
-/* Length in units of the trampoline for entering a nested function.  */
-#define TRAMPOLINE_SIZE  12
+/* Length in units of the trampoline for entering a nested function (padded to
+   L1 cache line size).  */
+#define TRAMPOLINE_SIZE  32
 
-/* Alignment required for a trampoline in bits.  */
-#define TRAMPOLINE_ALIGNMENT  16
+/* Alignment required for a trampoline in bits (the size of an L1 icache
+   line).  */
+#define TRAMPOLINE_ALIGNMENT  (8 * 32)
 
 /* Macros to check register numbers against specific register classes.  */
 
@@ -500,6 +502,50 @@ extern const enum reg_class vc4_regno_reg_class[FIRST_PSEUDO_REGISTER];
 
 #undef WCHAR_TYPE_SIZE
 #define WCHAR_TYPE_SIZE BITS_PER_WORD
+
+/* This is suitable for bare metal, but might be better done as a SWI or
+   something if running under some future hypothetical RTOS.  */
+
+#define CLEAR_INSN_CACHE(BEG, END)                                         \
+{                                                                          \
+  int ints_enabled;                                                        \
+  void *_begin = (BEG), *_end = (END) - 1;                                 \
+  volatile int *const L1_IC0_CONTROL = (int*) 0x7ee02000;                  \
+  volatile int *const L1_IC0_FLUSH_S = (int*) 0x7ee02008;                  \
+  volatile int *const L1_IC0_FLUSH_E = (int*) 0x7ee0200c;                  \
+  volatile int *const L1_IC1_CONTROL = (int*) 0x7ee02080;                  \
+  volatile int *const L1_IC1_FLUSH_S = (int*) 0x7ee02088;                  \
+  volatile int *const L1_IC1_FLUSH_E = (int*) 0x7ee0208c;                  \
+  volatile int *const L1_D_CONTROL = (int*) 0x7ee02100;                    \
+  volatile int *const L1_D_FLUSH_S = (int*) 0x7ee02104;                    \
+  volatile int *const L1_D_FLUSH_E = (int*) 0x7ee02108;                    \
+  __asm__ __volatile__ ("mov %0,sr\n\tdi" : "=r" (ints_enabled));          \
+  *L1_D_FLUSH_S = _begin;                                                  \
+  *L1_D_FLUSH_E = _end;                                                    \
+  /* Flush dcache.  */                                                     \
+  unsigned tmp = *L1_D_CONTROL;                                            \
+  tmp |= 2; /* L1_D_CONTROL_DC0_FLUSH_SET.  */                             \
+  tmp |= 4; /* L1_D_CONTROL_DC1_FLUSH_SET.  */                             \
+  *L1_D_CONTROL = tmp;                                                     \
+  while ((*L1_D_CONTROL) & 6)                                              \
+    /* empty.  */;                                                         \
+  *L1_IC0_FLUSH_S = _begin;                                                \
+  *L1_IC0_FLUSH_E = _end;                                                  \
+  *L1_IC1_FLUSH_S = _begin;                                                \
+  *L1_IC1_FLUSH_E = _end;                                                  \
+  /* Flush icache.  (Maybe we should figure out which core we are running  \
+     on rather than just flushing both caches?).  */                       \
+  unsigned tmp1, tmp2;                                                     \
+  *L1_IC0_CONTROL |= 2; /* L1_IC0_CONTROL_START_FLUSH_SET.  */             \
+  *L1_IC1_CONTROL |= 2; /* L1_IC1_CONTROL_START_FLUSH_SET.  */             \
+  tmp1 = *L1_IC0_CONTROL;                                                  \
+  tmp2 = *L1_IC1_CONTROL;                                                  \
+  tmp1 += tmp2;                                                            \
+  __asm__ __volatile__ ("nop\n\tnop\n\tnop\n\tnop\n\tnop\n\tnop"           \
+                        : : "r" (tmp1));                                   \
+  if (ints_enabled & (1 << 30))                                            \
+    __asm__ __volatile__ ("ei");                                           \
+}
 
 /* Max number of bytes we can move from memory to memory
    in one reasonably fast instruction.  */
@@ -585,7 +631,7 @@ extern const enum reg_class vc4_regno_reg_class[FIRST_PSEUDO_REGISTER];
    to a multiple of 2**LOG bytes.  */
 #define ASM_OUTPUT_ALIGN(FILE,LOG)	\
   if ((LOG) != 0)			\
-    fprintf (FILE, "\t.align\t%d\n", LOG)
+    fprintf (FILE, "\t.p2align\t%d\n", LOG)
 
 #ifndef ASM_DECLARE_RESULT
 #define ASM_DECLARE_RESULT(FILE, RESULT)
@@ -615,7 +661,7 @@ extern const enum reg_class vc4_regno_reg_class[FIRST_PSEUDO_REGISTER];
 /* Jump tables must be 32 bit aligned.  */
 #undef  ASM_OUTPUT_CASE_LABEL
 #define ASM_OUTPUT_CASE_LABEL(STREAM,PREFIX,NUM,TABLE) \
-  fprintf (STREAM, "\t.align 2\n.%s%d:\n", PREFIX, NUM);
+  fprintf (STREAM, "\t.p2align 2\n.%s%d:\n", PREFIX, NUM);
 
 /* Output a relative address. Not needed since jump tables are absolute
    but we must define it anyway.  */
