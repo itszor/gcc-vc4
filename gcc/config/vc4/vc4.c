@@ -1029,36 +1029,42 @@ void
 vc4_asm_trampoline_template (FILE *f)
 {
   asm_fprintf (f, "\tmov %r, #0x12345678\n", STATIC_CHAIN_REGNUM);
-  /* FIXME: I don't know if this works on the H/W.  */
-  asm_fprintf (f, "\tmov %r, #0x12345678\n", PC_REGNUM);
+  asm_fprintf (f, "\tj 0x12345678\n");
+  for (int i = 0; i < 10; i++)
+    asm_fprintf (f, "\tnop\n");
 }
 
 void
 vc4_trampoline_init (rtx m_tramp, tree fndecl, rtx static_chain)
 {
-  emit_block_move (m_tramp, assemble_trampoline_template (),
+  rtx m_tramp_l2only = adjust_address (m_tramp, HImode, 0x80000000);
+
+  emit_block_move (m_tramp_l2only, assemble_trampoline_template (),
                    GEN_INT (TRAMPOLINE_SIZE), BLOCK_OP_NORMAL);
 
   /* We have to move by halfwords because insns have 16-bit alignment so we
      can't use a single 32-bit move.  */
-  rtx mem = adjust_address (m_tramp, HImode, 2);
+  rtx mem = adjust_address (m_tramp_l2only, HImode, 2);
   rtx tmp = force_reg (SImode, static_chain);
   emit_move_insn (mem, gen_lowpart (HImode, tmp));
-  mem = adjust_address (m_tramp, HImode, 4);
+  mem = adjust_address (m_tramp_l2only, HImode, 4);
   tmp = gen_rtx_LSHIFTRT (SImode, static_chain, GEN_INT (16));
   tmp = force_reg (SImode, tmp);
   emit_move_insn (mem, gen_lowpart (HImode, tmp));
 
-  mem = adjust_address (m_tramp, HImode, 8);
+  mem = adjust_address (m_tramp_l2only, HImode, 8);
   rtx fnaddr = XEXP (DECL_RTL (fndecl), 0);
   tmp = force_reg (SImode, fnaddr);
   emit_move_insn (mem, gen_lowpart (HImode, tmp));
-  mem = adjust_address (m_tramp, HImode, 10);
+  mem = adjust_address (m_tramp_l2only, HImode, 10);
   tmp = gen_rtx_LSHIFTRT (SImode, fnaddr, GEN_INT (16));
   tmp = force_reg (SImode, tmp);
   emit_move_insn (mem, gen_lowpart (HImode, tmp));
 
-  /* Hmm, we don't know how to flush the cache.  */
+  rtx a_tramp = XEXP (m_tramp, 0);
+  emit_library_call (gen_rtx_SYMBOL_REF (Pmode, "__clear_cache"),
+                     LCT_NORMAL, VOIDmode, 2, a_tramp, Pmode,
+                     plus_constant (Pmode, a_tramp, TRAMPOLINE_SIZE), Pmode);
 }
 
 void
