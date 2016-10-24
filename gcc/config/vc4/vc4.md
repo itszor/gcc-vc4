@@ -565,34 +565,24 @@
 )
 
 (define_insn "extendqisi2"
-  [
-    (set
-      (match_operand:SI 0 "register_operand" "=f,r")
-      (sign_extend:SI
-        (match_operand:QI 1 "register_operand" "0,r")
-      )
-    )
-  ]
+  [(set (match_operand:SI 0 "register_operand"  "=f,r")
+        (sign_extend:SI
+          (match_operand:QI 1 "register_operand" "0,r")))]
   ""
   "@
-  	signext %0, #8
-	signext %0, %1, #8"
+  signext %0, #7
+  signext %0, %1, #7"
   [(set_attr "length" "2,4")]
 )
 
 (define_insn "extendhisi2"
-  [
-    (set
-      (match_operand:SI 0 "register_operand" "=f,r")
-      (sign_extend:SI
-        (match_operand:HI 1 "register_operand" "0,r")
-      )
-    )
-  ]
+  [(set (match_operand:SI 0 "register_operand"  "=f,r")
+        (sign_extend:SI
+          (match_operand:HI 1 "register_operand" "0,r")))]
   ""
   "@
-  	signext %0, #16
-	signext %0, %1, #16"
+  signext %0, #15
+  signext %0, %1, #15"
   [(set_attr "length" "2,4")]
 )
 
