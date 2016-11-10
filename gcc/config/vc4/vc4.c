@@ -1123,7 +1123,7 @@ vc4_function_arg (cumulative_args_t cum, machine_mode mode,
 
   arg_reg = *get_cumulative_args (cum);
 
-  if (arg_reg + num_arg_regs (mode, type) <= NPARM_REGS)
+  if (arg_reg < NPARM_REGS)
     return gen_rtx_REG (mode, arg_reg + FIRST_PARM_REG);
 
   return 0;
@@ -1131,65 +1131,55 @@ vc4_function_arg (cumulative_args_t cum, machine_mode mode,
 
 static void
 vc4_function_arg_advance (cumulative_args_t cum_v, machine_mode mode,
-			  const_tree type, bool named ATTRIBUTE_UNUSED)
+			  const_tree type, bool named)
 {
   CUMULATIVE_ARGS *cum = get_cumulative_args (cum_v);
 
-  (*cum) += (int) named * num_arg_regs (mode, type);
+  if (!named)
+    return;
+
+  (*cum) += num_arg_regs (mode, type);
 }
 
 static unsigned int
-vc4_function_arg_boundary(machine_mode mode,
-                          const_tree type ATTRIBUTE_UNUSED)
+vc4_function_arg_boundary (machine_mode mode, const_tree type ATTRIBUTE_UNUSED)
 {
-    /*
-     * Doubles must be aligned to an 8 byte boundary.  
-     */
-    return (mode != BLKmode && GET_MODE_SIZE(mode) == 8
-            ? BIGGEST_ALIGNMENT : PARM_BOUNDARY);
+  return PARM_BOUNDARY;
 }
 
-/*
- * Returns the number of bytes of argument registers required to hold
- * *part* of a parameter of machine mode MODE and type TYPE (which may be
- * NULL if the type is not known).  If the argument fits entirely in the
- * argument registers, or entirely on the stack, then 0 is returned.  CUM
- * is the number of argument registers already used by earlier parameters
- * to the function.  
- */
+/* Returns the number of bytes of argument registers required to hold
+   *part* of a parameter of machine mode MODE and type TYPE (which may be
+   NULL if the type is not known).  If the argument fits entirely in the
+   argument registers, or entirely on the stack, then 0 is returned.  CUM
+   is the number of argument registers already used by earlier parameters
+   to the function.  */
 
 static int
-vc4_arg_partial_bytes(cumulative_args_t cum, machine_mode mode,
-                      tree type, bool named)
+vc4_arg_partial_bytes (cumulative_args_t cum, machine_mode mode,
+                       tree type, bool named)
 {
-    int reg = *get_cumulative_args (cum);
+  int reg = *get_cumulative_args (cum);
 
-    if (named == 0)
-        return 0;
+  if (named == 0)
+    return 0;
 
-    if (targetm.calls.must_pass_in_stack(mode, type))
-        return 0;
+  if (targetm.calls.must_pass_in_stack (mode, type))
+    return 0;
 
-    if (reg >= NPARM_REGS)
-        return 0;
+  if (reg >= NPARM_REGS)
+    return 0;
 
-    /*
-     * If the argument fits entirely in registers, return 0.  
-     */
-    if (reg + num_arg_regs(mode, type) <= NPARM_REGS)
-        return 0;
+  /* If the argument fits entirely in registers, return 0.  */
+  if (reg + num_arg_regs (mode, type) <= NPARM_REGS)
+    return 0;
 
-    /*
-     * The argument overflows the number of available argument registers.
-     * Compute how many argument registers have not yet been assigned to
-     * hold an argument.  
-     */
-    reg = NPARM_REGS - reg;
+  /* The argument overflows the number of available argument registers.
+     Compute how many argument registers have not yet been assigned to
+     hold an argument.  */
+  reg = NPARM_REGS - reg;
 
-    /*
-     * Return partially in registers and partially on the stack.  
-     */
-    return reg * UNITS_PER_WORD;
+  /* Return partially in registers and partially on the stack.  */
+  return reg * UNITS_PER_WORD;
 }
 
 
@@ -1436,8 +1426,8 @@ vc4_legitimate_constant_p(machine_mode mode ATTRIBUTE_UNUSED, rtx x)
 #define TARGET_MUST_PASS_IN_STACK	must_pass_in_stack_var_size
 #undef  TARGET_PASS_BY_REFERENCE
 #define TARGET_PASS_BY_REFERENCE  hook_pass_by_reference_must_pass_in_stack
-/*#undef  TARGET_ARG_PARTIAL_BYTES
-#define TARGET_ARG_PARTIAL_BYTES	vc4_arg_partial_bytes*/
+#undef  TARGET_ARG_PARTIAL_BYTES
+#define TARGET_ARG_PARTIAL_BYTES	vc4_arg_partial_bytes
 #undef  TARGET_FUNCTION_ARG
 #define TARGET_FUNCTION_ARG		vc4_function_arg
 #undef  TARGET_FUNCTION_ARG_ADVANCE
