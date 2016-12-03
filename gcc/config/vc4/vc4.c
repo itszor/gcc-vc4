@@ -1215,14 +1215,6 @@ static bool vc4_warn_func_return(tree decl)
     return lookup_attribute("naked", DECL_ATTRIBUTES(decl)) == NULL_TREE;
 }
 
-static void
-vc4_asm_named_section (const char *name,
-                       unsigned int flags ATTRIBUTE_UNUSED,
-                       tree decl ATTRIBUTE_UNUSED)
-{
-  fprintf (asm_out_file, "\t.section %s\n", name);
-}
-
 /* TARGET_RETURN_IN_MEMORY: decides whether a value can be returned in
  * registers or must be written to memory.
  */
@@ -1481,7 +1473,7 @@ vc4_legitimate_constant_p(machine_mode mode ATTRIBUTE_UNUSED, rtx x)
 #define TARGET_RTX_COSTS                vc4_target_rtx_costs
 
 #undef TARGET_ASM_NAMED_SECTION
-#define TARGET_ASM_NAMED_SECTION vc4_asm_named_section
+#define TARGET_ASM_NAMED_SECTION default_elf_asm_named_section
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 
