@@ -39,6 +39,10 @@
   UNSPEC_PRLG_STK
 ])
 
+(define_c_enum "unspecv" [
+  VUNSPEC_EH_RETURN
+])
+
 ;; --- Special --------------------------------------------------------------
 
 (define_insn "nop"
@@ -670,6 +674,19 @@
     }
 
   emit_insn (gen_blockage ());
+  DONE;
+})
+
+(define_insn_and_split "eh_return"
+  [(unspec_volatile [(match_operand:SI 0 "register_operand" "r")]
+		    VUNSPEC_EH_RETURN)
+   (clobber (match_scratch:SI 1 "=&r"))]
+  ""
+  "#"
+  "&& reload_completed"
+  [(const_int 0)]
+{
+  vc4_set_return_address (operands[0], operands[1]);
   DONE;
 })
 

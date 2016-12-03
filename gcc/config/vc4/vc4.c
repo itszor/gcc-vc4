@@ -1181,6 +1181,31 @@ vc4_arg_partial_bytes (cumulative_args_t cum, machine_mode mode,
   /* Return partially in registers and partially on the stack.  */
   return reg * UNITS_PER_WORD;
 }
+
+void
+vc4_set_return_address (rtx source, rtx scratch)
+{
+  struct machine_function *offsets = vc4_compute_frame ();
+  if (!offsets->lrneedssaving)
+    emit_move_insn (gen_rtx_REG (Pmode, LR_REG), source);
+  else
+    {
+      rtx addr;
+      if (frame_pointer_needed)
+        addr = plus_constant (Pmode, hard_frame_pointer_rtx,
+                              offsets->local_vars + offsets->local_vars_padding
+                              + offsets->callee_saves - 4);
+      else
+        addr = plus_constant (Pmode, stack_pointer_rtx,
+                              offsets->outgoing_args_size + offsets->local_vars
+                              + offsets->local_vars_padding
+                              + offsets->callee_saves - 4);
+      rtx insn = emit_move_insn (gen_frame_mem (Pmode, addr), source);
+      RTX_FRAME_RELATED_P (insn) = 1;
+      add_reg_note (insn, REG_CFA_RESTORE, gen_rtx_REG (Pmode, LR_REG));
+    }
+}
+
 
 
 /*

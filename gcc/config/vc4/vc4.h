@@ -395,6 +395,11 @@ extern const enum reg_class vc4_regno_reg_class[FIRST_PSEUDO_REGISTER];
 /* Offset of first parameter from the argument pointer register value.  */
 #define FIRST_PARM_OFFSET(FNDECL)  0
 
+#define EH_RETURN_DATA_REGNO(N) (((N) < 2) ? (N) : INVALID_REGNUM)
+
+#define VC4_EH_STACKADJ_REGNUM 2
+#define EH_RETURN_STACKADJ_RTX gen_rtx_REG (SImode, VC4_EH_STACKADJ_REGNUM)
+
 /* Don't default to pcc-struct-return, because gcc is the only compiler, and
    we want to retain compatibility with older gcc versions.  */
 #define DEFAULT_PCC_STRUCT_RETURN 0
@@ -679,5 +684,8 @@ extern const enum reg_class vc4_regno_reg_class[FIRST_PSEUDO_REGISTER];
 #undef  ASM_OUTPUT_SKIP
 #define ASM_OUTPUT_SKIP(FILE,SIZE)  \
   fprintf (FILE, "\t.fill %d, 1\n", (int)(SIZE))
+
+#define ASM_PREFERRED_EH_DATA_FORMAT(CODE, GLOBAL) \
+  ((CODE) ? DW_EH_PE_pcrel : DW_EH_PE_indirect)
 
 #endif                          /* ! GCC_VC4_H */

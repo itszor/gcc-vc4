@@ -35,5 +35,6 @@ extern const char *vc4_emit_multi_reg_push (rtx par);
 extern const char *vc4_emit_multi_reg_pop (rtx par);
 extern void vc4_expand_prologue (void);
 extern void vc4_expand_epilogue (void);
+extern void vc4_set_return_address (rtx, rtx);
 
 #endif
