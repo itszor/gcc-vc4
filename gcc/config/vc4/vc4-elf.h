@@ -24,11 +24,10 @@
 #ifndef __VC4_ELF_H__
 #define __VC4_ELF_H__
 
-/* Don't use DWARF2 debugging info (for now).  */
-/*#undef DWARF2_DEBUGGING_INFO*/
-
 #define PREFERRED_DEBUGGING_TYPE DWARF2_DEBUG
-
+#define DWARF2_DEBUGGING_INFO 1
+#define DWARF2_UNWIND_INFO 0
+#define OBJECT_FORMAT_ELF
 
 /* Output the size directive for a decl in rest_of_decl_compilation
    in the case where we did not do so before the initializer.
