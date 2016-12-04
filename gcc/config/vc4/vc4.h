@@ -686,6 +686,6 @@ extern const enum reg_class vc4_regno_reg_class[FIRST_PSEUDO_REGISTER];
   fprintf (FILE, "\t.fill %d, 1\n", (int)(SIZE))
 
 #define ASM_PREFERRED_EH_DATA_FORMAT(CODE, GLOBAL) \
-  ((CODE) ? DW_EH_PE_pcrel : DW_EH_PE_indirect)
+  (((GLOBAL) ? DW_EH_PE_indirect : 0) | DW_EH_PE_absptr)
 
 #endif                          /* ! GCC_VC4_H */
