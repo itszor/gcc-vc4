@@ -1206,6 +1206,28 @@ vc4_set_return_address (rtx source, rtx scratch)
     }
 }
 
+void
+vc4_asm_output_mi_thunk (FILE *file, tree, HOST_WIDE_INT delta,
+			 HOST_WIDE_INT, tree function)
+{
+  int mi_delta = delta;
+  const char *const mi_op = mi_delta < 0 ? "sub" : "add";
+  int this_regno = (aggregate_value_p (TREE_TYPE (TREE_TYPE (function)),
+				       function) ? 1 : 0);
+
+  if (mi_delta < 0)
+    mi_delta = -mi_delta;
+
+  final_start_function (emit_barrier (), file, 1);
+
+  asm_fprintf (file, "\t%s\t%r, #%d\n", mi_op, this_regno, mi_delta);
+  fputs ("\tb\t", file);
+  assemble_name (file, XSTR (XEXP (DECL_RTL (function), 0), 0));
+  fputc ('\n', file);
+
+  final_end_function ();
+}
+
 
 
 /*
@@ -1499,6 +1521,12 @@ vc4_legitimate_constant_p(machine_mode mode ATTRIBUTE_UNUSED, rtx x)
 
 #undef TARGET_ASM_NAMED_SECTION
 #define TARGET_ASM_NAMED_SECTION default_elf_asm_named_section
+
+#undef TARGET_ASM_OUTPUT_MI_THUNK
+#define TARGET_ASM_OUTPUT_MI_THUNK vc4_asm_output_mi_thunk
+
+#undef  TARGET_ASM_CAN_OUTPUT_MI_THUNK
+#define TARGET_ASM_CAN_OUTPUT_MI_THUNK default_can_output_mi_thunk_no_vcall
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 
