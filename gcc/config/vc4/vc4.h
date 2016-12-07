@@ -647,9 +647,8 @@ extern const enum reg_class vc4_regno_reg_class[FIRST_PSEUDO_REGISTER];
     fprintf (FILE, "%s", reg_names [va_arg (ARGS, int)]);	\
     break;
 
-#define MULTIPLE_SYMBOL_SPACES 1
-
 #define SUPPORTS_ONE_ONLY 1
+#define SUPPORTS_WEAK 1
 
 /* Globalizing directive for a label.  */
 #define GLOBAL_ASM_OP "\t.globl\t"
