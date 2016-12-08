@@ -723,9 +723,9 @@ vc4_emit_multi_reg_push (rtx par)
         {
 	  operands[0] = gen_rtx_REG (SImode, lo_reg);
 	  if (lr_included)
-            output_asm_insn ("stm %0, lr, (--sp)", operands);
+            output_asm_insn ("stm\t%0,lr,(--sp)", operands);
 	  else
-	    output_asm_insn ("stm %0, (--sp)", operands);
+	    output_asm_insn ("stm\t%0,(--sp)", operands);
 	  return "";
 	}
     }
@@ -734,9 +734,9 @@ vc4_emit_multi_reg_push (rtx par)
       operands[0] = gen_rtx_REG (SImode, lo_reg);
       operands[1] = gen_rtx_REG (SImode, hi_reg);
       if (lr_included)
-        output_asm_insn ("stm %0-%1, lr, (--sp)", operands);
+        output_asm_insn ("stm\t%0-%1,lr,(--sp)", operands);
       else
-	output_asm_insn ("stm %0-%1, (--sp)", operands);
+	output_asm_insn ("stm\t%0-%1,(--sp)", operands);
       return "";
     }
 }
@@ -802,11 +802,11 @@ vc4_emit_multi_reg_pop (rtx par)
         {
 	  operands[0] = gen_rtx_REG (SImode, lo_reg);
 	  if (pc_included)
-            output_asm_insn ("ldm %0, pc, (sp++)", operands);
+            output_asm_insn ("ldm\t%0,pc,(sp++)", operands);
 	  else if (lo_reg == LR_REG)
-            output_asm_insn ("ld %0, (sp++)", operands);
+            output_asm_insn ("ld\t%0,(sp++)", operands);
           else
-	    output_asm_insn ("ldm %0, (sp++)", operands);
+	    output_asm_insn ("ldm\t%0,(sp++)", operands);
 	  return "";
 	}
     }
@@ -815,9 +815,9 @@ vc4_emit_multi_reg_pop (rtx par)
       operands[0] = gen_rtx_REG (SImode, lo_reg);
       operands[1] = gen_rtx_REG (SImode, hi_reg);
       if (pc_included)
-        output_asm_insn ("ldm %0-%1, pc, (sp++)", operands);
+        output_asm_insn ("ldm\t%0-%1,pc,(sp++)", operands);
       else
-	output_asm_insn ("ldm %0-%1, (sp++)", operands);
+	output_asm_insn ("ldm\t%0-%1,(sp++)", operands);
       return "";
     }
 }
@@ -1028,8 +1028,8 @@ vc4_expand_epilogue (void)
 void
 vc4_asm_trampoline_template (FILE *f)
 {
-  asm_fprintf (f, "\tmov %r, #0x12345678\n", STATIC_CHAIN_REGNUM);
-  asm_fprintf (f, "\tj 0x12345678\n");
+  asm_fprintf (f, "\tmov\t%r,#0x12345678\n", STATIC_CHAIN_REGNUM);
+  asm_fprintf (f, "\tj\t0x12345678\n");
   for (int i = 0; i < 10; i++)
     asm_fprintf (f, "\tnop\n");
 }
@@ -1220,7 +1220,7 @@ vc4_asm_output_mi_thunk (FILE *file, tree, HOST_WIDE_INT delta,
 
   final_start_function (emit_barrier (), file, 1);
 
-  asm_fprintf (file, "\t%s\t%r, #%d\n", mi_op, this_regno, mi_delta);
+  asm_fprintf (file, "\t%s\t%r,#%d\n", mi_op, this_regno, mi_delta);
   fputs ("\tb\t", file);
   assemble_name (file, XSTR (XEXP (DECL_RTL (function), 0), 0));
   fputc ('\n', file);
@@ -1324,6 +1324,23 @@ vc4_regno_ok_for_fast_base_p (int regno, bool strict_p)
 }
 
 static bool
+vc4_sp_regno_p (int regno, bool strict_p)
+{
+  if (regno >= FIRST_PSEUDO_REGISTER)
+    {
+      if (!strict_p)
+        return true;
+
+      if (!reg_renumber)
+        return false;
+
+      regno = reg_renumber[regno];
+    }
+
+  return regno == SP_REG;
+}
+
+static bool
 vc4_fast_address_register_p (rtx x, bool strict_p)
 {
   if (GET_CODE (x) == SUBREG)
@@ -1379,25 +1396,26 @@ vc4_legitimate_address_p (machine_mode mode, rtx x, bool strict)
 bool
 vc4_short_form_addr_p (machine_mode mode, rtx x, bool strict_p)
 {
-  if (vc4_fast_address_register_p (x, strict_p)
-      || (REG_P (x) && REGNO (x) == SP_REG))
+  if (vc4_fast_address_register_p (x, strict_p))
     return true;
+
+  if (GET_MODE_SIZE (mode) != 4)
+    return false;
 
   if (GET_CODE (x) == PLUS
       && vc4_fast_address_register_p (XEXP (x, 0), strict_p)
-      && GET_MODE_SIZE (mode) == 4
       && GET_CODE (XEXP (x, 1)) == CONST_INT
       && INTVAL (XEXP (x, 1)) >= 0
       && INTVAL (XEXP (x, 1)) < 64
       && (INTVAL (XEXP (x, 1)) & 3) == 0)
     return true;
 
+  if (REG_P (x) && vc4_sp_regno_p (REGNO (x), strict_p))
+    return true;
+
   if (GET_CODE (x) == PLUS
       && REG_P (XEXP (x, 0))
-      && (REGNO (XEXP (x, 0)) == SP_REG
-	  || (strict_p && REGNO (XEXP (x, 0)) >= FIRST_PSEUDO_REGISTER
-	      && reg_renumber[REGNO (XEXP (x, 0))] == SP_REG))
-      && GET_MODE_SIZE (mode) == 4
+      && vc4_sp_regno_p (REGNO (XEXP (x, 0)), strict_p)
       && GET_CODE (XEXP (x, 1)) == CONST_INT
       && INTVAL (XEXP (x, 1)) >= 0
       && INTVAL (XEXP (x, 1)) < 128

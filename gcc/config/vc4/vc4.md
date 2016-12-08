@@ -64,45 +64,28 @@
     operands[1] = force_reg (<MODE>mode, operands[1]);
 })
 
-;(define_expand "movdi"
-;  [(set (match_operand:DI 0 "nonimmediate_operand" "")
-;	(match_operand:DI 1 "general_operand" ""))]
-;  ""
-;{
-;  if (MEM_P (operands[0]))
-;    operands[1] = force_reg (DImode, operands[1]);
-;})
-
 ;; --- Generic moves --------------------------------------------------------
+
+; TODO: we can add,
+;   not rN,#imm (short form, inverted immediate 0-31).
+;   32-bit ld/st variants.
 
 (define_insn "*mov<mode>_insn"
   [(set (match_operand:QHSI 0 "nonimmediate_operand" "=f,f,r,r,r, f,r, Us,Ul")
 	(match_operand:QHSI 1 "general_operand"	      "I,f,I,i,r,Us,Ul, f, r"))]
   ""
   "@
-  mov %0, #%1\t; fast
-  mov %0, %1\t; fast
-  mov %0, #%1\t; slow smallint
-  mov %0, #%1\t; largeint
-  mov %0, %1\t; slow
-  ld<suffix> %0, %1\t;short form
-  ld<suffix> %0, %1\t;long form
-  st<suffix> %1, %0\t;short form
-  st<suffix> %1, %0\t;long form"
-  [(set_attr "length" "2,2,4,6,4,2,4,2,4")]
+  mov.s\t%0,#%1
+  mov.s\t%0,%1
+  mov.m\t%0,#%1
+  mov.l\t%0,#%1
+  mov.m\t%0,%1
+  ld<suffix>.s\t%0,%1
+  ld<suffix>.l\t%0,%1
+  st<suffix>.s\t%1,%0
+  st<suffix>.l\t%1,%0"
+  [(set_attr "length" "2,2,4,6,4,2,6,2,6")]
 )
-
-;(define_insn "*movdi_insn"
-;  [(set (match_operand:DI 0 "nonimmediate_operand" "=r,r,r,m")
-;	(match_operand:DI 1 "general_operand"       "r,i,m,r"))]
-;  ""
-;  "@
-;  movdi %0,%1
-;  movdi %0,#%1
-;  ldd %0,%1
-;  std %1,%0"
-;  [(set_attr "length" "4")]
-;)
 
 ;; pushes/pops.
 
@@ -207,12 +190,12 @@
 		 (match_operand:SI 2 "nonmemory_operand" "f,I,r,I,i,i")))]
   ""
   "@
-  add %0,%2
-  add %0,#%2
-  add %0,%1,%2
-  add %0,%1,#%2
-  add %0,#%2
-  add %0,%1,#%2"
+  add.s\t%0,%2
+  add.s\t%0,#%2
+  add.m\t%0,%1,%2
+  add.m\t%0,%1,#%2
+  add.l\t%0,#%2
+  add.l\t%0,%1,#%2"
   [(set_attr "length" "2,2,4,4,6,6")]
 )
 
@@ -222,10 +205,10 @@
 		   (match_operand:SI 2 "nonmemory_operand" "f,I,r,I")))]
   ""
   "@
-  shl %0,%2
-  shl %0,#%2
-  shl %0,%1,%2
-  shl %0,%1,#%2"
+  shl.s\t%0,%2
+  shl.s\t%0,#%2
+  shl.m\t%0,%1,%2
+  shl.m\t%0,%1,#%2"
   [(set_attr "length" "2,2,4,4")]
 )
 
@@ -235,10 +218,10 @@
 		     (match_operand:SI 2 "nonmemory_operand" "f,I,r,I")))]
   ""
   "@
-  asr %0,%2
-  asr %0,#%2
-  asr %0,%1,%2
-  asr %0,%1,#%2"
+  asr.s\t%0,%2
+  asr.s\t%0,#%2
+  asr.m\t%0,%1,%2
+  asr.m\t%0,%1,#%2"
   [(set_attr "length" "2,2,4,4")]
 )
 
@@ -248,10 +231,10 @@
 		     (match_operand:SI 2 "nonmemory_operand" "f,I,r,I")))]
   ""
   "@
-  lsr %0,%2
-  lsr %0,#%2
-  lsr %0,%1,%2
-  lsr %0,%1,#%2"
+  lsr.s\t%0,%2
+  lsr.s\t%0,#%2
+  lsr.m\t%0,%1,%2
+  lsr.m\t%0,%1,#%2"
   [(set_attr "length" "2,2,4,4")]
 )
 
@@ -261,9 +244,9 @@
 		     (match_operand:SI 2 "nonmemory_operand" "f,r,I")))]
   ""
   "@
-  ror %0,%2
-  ror %0,%1,%2
-  ror %0,%1,#%2"
+  ror.s\t%0,%2
+  ror.m\t%0,%1,%2
+  ror.m\t%0,%1,#%2"
   [(set_attr "length" "2,4,4")]
 )
 
@@ -273,11 +256,11 @@
                  (match_operand:SI 2 "nonmemory_operand" "f,I,r,I,i")))]
   ""
   "@
-  mul %0,%2
-  mul %0,#%2
-  mul %0,%1,%2
-  mul %0,%1,#%2
-  mul %0,#%2"
+  mul.s\t%0,%2
+  mul.s\t%0,#%2
+  mul.m\t%0,%1,%2
+  mul.m\t%0,%1,#%2
+  mul.l\t%0,#%2"
   [(set_attr "length" "2,2,4,4,6")]
 )
 
@@ -289,43 +272,41 @@
                 (match_operand:SI 2 "nonmemory_operand" "f,r,I,i")))]
   ""
   "@
-  eor %0,%2
-  eor %0,%1,%2
-  eor %0,%1,#%2
-  eor %0,#%2"
+  eor.s\t%0,%2
+  eor.m\t%0,%1,%2
+  eor.m\t%0,%1,#%2
+  eor.l\t%0,#%2"
   [(set_attr "length" "2,4,4,6")]
 )
 
 ; TODO: Add BCLR immediate, BIC immediate.
 
 (define_insn "andsi3"
-  [(set (match_operand:SI 0 "register_operand"         "=f,f,r,r,r")
-        (and:SI (match_operand:SI 1 "register_operand"  "0,0,r,r,0")
-                (match_operand:SI 2 "nonmemory_operand" "f,I,r,I,i")))]
+  [(set (match_operand:SI 0 "register_operand"         "=f,r,r,r")
+        (and:SI (match_operand:SI 1 "register_operand"  "0,r,r,0")
+                (match_operand:SI 2 "nonmemory_operand" "f,r,I,i")))]
   ""
   "@
-  and %0,%2
-  and %0,#%2
-  and %0,%1,%2
-  and %0,%1,#%2
-  and %0,#%2"
-  [(set_attr "length" "2,2,4,4,6")]
+  and.s\t%0,%2
+  and.m\t%0,%1,%2
+  and.m\t%0,%1,#%2
+  and.l\t%0,#%2"
+  [(set_attr "length" "2,4,4,6")]
 )
 
 ; TODO: Add BSET immediate.
 
 (define_insn "iorsi3"
-  [(set (match_operand:SI 0 "register_operand"         "=f,f,r,r,r")
-        (ior:SI (match_operand:SI 1 "register_operand"  "0,0,r,r,0")
-                (match_operand:SI 2 "nonmemory_operand" "f,I,r,I,i")))]
+  [(set (match_operand:SI 0 "register_operand"         "=f,r,r,r")
+        (ior:SI (match_operand:SI 1 "register_operand"  "0,r,r,0")
+                (match_operand:SI 2 "nonmemory_operand" "f,r,I,i")))]
   ""
   "@
-  or %0,%2
-  or %0,#%2
-  or %0,%1,%2
-  or %0,%1,#%2
-  or %0,#%2"
-  [(set_attr "length" "2,2,4,4,6")]
+  or.s\t%0,%2
+  or.m\t%0,%1,%2
+  or.m\t%0,%1,#%2
+  or.l\t%0,#%2"
+  [(set_attr "length" "2,4,4,6")]
 )
 
 (define_insn "one_cmplsi2"
@@ -333,8 +314,8 @@
 	(not:SI (match_operand:SI 1 "register_operand" "f,r")))]
   ""
   "@
-  not %0,%1
-  not %0,%1"
+  not.s\t%0,%1
+  not.m\t%0,%1"
   [(set_attr "length" "2,4")]
 )
 
@@ -343,55 +324,42 @@
 ;; These ALU instructions are weird and so need special-cased patterns.
 
 (define_insn "subsi3"
-  [(set (match_operand:SI 0 "register_operand"   "=f,f,f,f,r,r,r,r,r")
+  [(set (match_operand:SI 0 "register_operand"   "=f,f,f,r,r,r,r,r")
 	(minus:SI
-	  (match_operand:SI 1 "register_operand"  "0,I,0,f,r,I,0,i,r")
-          (match_operand:SI 2 "nonmemory_operand" "I,0,f,0,I,r,i,0,r")))]
+	  (match_operand:SI 1 "register_operand"  "0,0,f,r,I,0,i,r")
+          (match_operand:SI 2 "nonmemory_operand" "I,f,0,I,r,i,0,r")))]
   ""
   "@
-   sub %0, #%2 ; fast smallint
-   rsub %0, #%1 ; fast smallint
-   sub %0, %2 ; fast reg
-   rsub %0, %1 ; fast smallint
-   sub %0, %1, #%2 ; slow smallint
-   rsub %0, %2, #%1 ; slow smallint
-   sub %0, #%2 ; largeint 2op
-   rsub %0, #%1 ; largeint 2op
-   sub %0, %1, %2"
-  [(set_attr "length" "2,2,2,2,4,4,6,6,4")]
+   sub.s\t%0,#%2
+   sub.s\t%0,%2
+   rsub.s\t%0,%1
+   sub.m\t%0,%1,#%2
+   rsub.m\t%0,%2,#%1
+   sub.l\t%0,#%2
+   rsub.l\t%0,#%1
+   sub.m\t%0,%1,%2"
+  [(set_attr "length" "2,2,2,4,4,6,6,4")]
 )
 
 (define_insn "divsi3"
-  [
-    (set
-      (match_operand:SI 0 "register_operand" "=r,r")
-      (div:SI
-        (match_operand:SI 1 "register_operand" "r,r")
-        (match_operand:SI 2 "nonmemory_operand" "r,J")
-      )
-    )
-  ]
+  [(set (match_operand:SI 0 "register_operand"         "=r,r")
+	(div:SI (match_operand:SI 1 "register_operand"  "r,r")
+        	(match_operand:SI 2 "nonmemory_operand" "r,J")))]
   ""
   "@
-  	div.ss %0, %1, %2
-  	div.ss %0, %1, #%2"
+  div.ss\t%0,%1,%2
+  div.ss\t%0,%1,#%2"
   [(set_attr "length" "4,4")]
 )
 
 (define_insn "udivsi3"
-  [
-    (set
-      (match_operand:SI 0 "register_operand" "=r,r")
-      (udiv:SI
-        (match_operand:SI 1 "register_operand" "r,r")
-        (match_operand:SI 2 "nonmemory_operand" "r,J")
-      )
-    )
-  ]
+  [(set (match_operand:SI 0 "register_operand"          "=r,r")
+	(udiv:SI (match_operand:SI 1 "register_operand"  "r,r")
+        	 (match_operand:SI 2 "nonmemory_operand" "r,J")))]
   ""
   "@
-  	div.uu %0, %1, %2
-  	div.uu %0, %1, #%2"
+  div.uu\t%0,%1,%2
+  div.uu\t%0,%1,#%2"
   [(set_attr "length" "4,4")]
 )
 
@@ -448,123 +416,68 @@
 ;; Expand all FPU instructions.
 
 (define_insn "<fpu_list_3op:fpu_insn>"
-  [
-    (set
-      (match_operand:SF 0 "register_operand" "=r")
-      (fpu_list_3op:SF
-	(match_operand:SF 1 "register_operand" "r")
-	(match_operand:SF 2 "register_operand" "r")
-      )
-    )
-  ]
+  [(set (match_operand:SF 0 "register_operand" "=r")
+	(fpu_list_3op:SF
+	  (match_operand:SF 1 "register_operand" "r")
+	  (match_operand:SF 2 "register_operand" "r")))]
   ""
-  "<fpu_list_3op:fpu_opcode> %0, %1, %2"
+  "<fpu_list_3op:fpu_opcode>\t%0,%1,%2"
   [(set_attr "length" "4")]
 )
 
 (define_insn "<fpu_list_2op:fpu_insn>"
-  [
-    (set
-      (match_operand:SF 0 "register_operand" "=r")
-      (fpu_list_2op:SF
-	(match_operand:SF 1 "register_operand" "r")
-      )
-    )
-  ]
+  [(set (match_operand:SF 0 "register_operand" "=r")
+	(fpu_list_2op:SF (match_operand:SF 1 "register_operand" "r")))]
   ""
-  "<fpu_list_2op:fpu_opcode> %0, %1"
+  "<fpu_list_2op:fpu_opcode>\t%0,%1"
   [(set_attr "length" "4")]
 )
 
 ;; Extra float operations, such as conversions.
 
 (define_insn "fix_truncsfsi2"
-  [
-    (set
-      (match_operand:SI 0 "register_operand" "=r")
-      (fix:SI
-	(match_operand:SF 1 "register_operand" "r")
-      )
-    )
-  ]
+  [(set (match_operand:SI 0 "register_operand" "=r")
+        (fix:SI (match_operand:SF 1 "register_operand" "r")))]
   ""
-  "ftrunc %0, %1, sasl #0"
+  "ftrunc\t%0,%1,sasl #0"
   [(set_attr "length" "4")]
 )
 
-;(define_insn "fixuns_truncsfsi2"
-;  [
-;    (set
-;      (match_operand:SI 0 "register_operand" "=r")
-;      (unsigned_fix:SI
-;	(match_operand:SF 1 "register_operand" "r")
-;      )
-;    )
-;  ]
-;  ""
-;  "ftrunc %0, %1; sasl #0"
-;  [(set_attr "length" "4")]
-;)
-
 (define_insn "floatsisf2"
-  [
-    (set
-      (match_operand:SF 0 "register_operand" "=r")
-      (float:SF
-	(match_operand:SI 1 "register_operand" "r")
-      )
-    )
-  ]
+  [(set (match_operand:SF 0 "register_operand" "=r")
+	(float:SF (match_operand:SI 1 "register_operand" "r")))]
   ""
-  "flts %0, %1, sasr #0"
+  "flts\t%0,%1,sasr #0"
   [(set_attr "length" "4")]
 )
 
 (define_insn "floatunssisf2"
-  [
-    (set
-      (match_operand:SF 0 "register_operand" "=r")
-      (unsigned_float:SF
-	(match_operand:SI 1 "register_operand" "r")
-      )
-    )
-  ]
+  [(set (match_operand:SF 0 "register_operand" "=r")
+	(unsigned_float:SF (match_operand:SI 1 "register_operand" "r")))]
   ""
-  "fltu %0, %1, sasr #0"
+  "fltu\t%0,%1,sasr #0"
   [(set_attr "length" "4")]
 )
 
 ;; --- Sign extension -------------------------------------------------------
 
 (define_insn "zero_extendqisi2"
-  [
-    (set
-      (match_operand:SI 0 "register_operand" "=f,r")
-      (zero_extend:SI
-        (match_operand:QI 1 "register_operand" "0,r")
-      )
-    )
-  ]
+  [(set (match_operand:SI 0 "register_operand" "=f,r")
+	(zero_extend:SI (match_operand:QI 1 "register_operand" "0,r")))]
   ""
   "@
-  	bmask %0, #8
-	bmask %0, %1, #8"
+  bmask.s\t%0,#8
+  bmask.m\t%0,%1,#8"
   [(set_attr "length" "2,4")]
 )
 
 (define_insn "zero_extendhisi2"
-  [
-    (set
-      (match_operand:SI 0 "register_operand" "=f,r")
-      (zero_extend:SI
-        (match_operand:HI 1 "register_operand" "0,r")
-      )
-    )
-  ]
+  [(set (match_operand:SI 0 "register_operand" "=f,r")
+	(zero_extend:SI (match_operand:HI 1 "register_operand" "0,r")))]
   ""
   "@
-  	bmask %0, #16
-	bmask %0, %1, #16"
+  bmask.s\t%0,#16
+  bmask.m\t%0,%1,#16"
   [(set_attr "length" "2,4")]
 )
 
@@ -574,8 +487,8 @@
           (match_operand:QI 1 "register_operand" "0,r")))]
   ""
   "@
-  signext %0, #7
-  signext %0, %1, #7"
+  signext.s\t%0,#7
+  signext.m\t%0,%1,#7"
   [(set_attr "length" "2,4")]
 )
 
@@ -585,26 +498,24 @@
           (match_operand:HI 1 "register_operand" "0,r")))]
   ""
   "@
-  signext %0, #15
-  signext %0, %1, #15"
+  signext.s\t%0,#15
+  signext.m\t%0,%1,#15"
   [(set_attr "length" "2,4")]
 )
 
 ;; --- Jumps ----------------------------------------------------------------
 
 (define_insn "indirect_jump"
-  [(set (pc)
-  	(match_operand:SI 0 "register_operand" "r"))]
+  [(set (pc) (match_operand:SI 0 "register_operand" "r"))]
   ""
-  "b %0"
+  "b\t%0"
   [(set_attr "length" "2")]
 )
 
 (define_insn "jump"
-  [(set (pc)
-	(label_ref (match_operand 0 "" "")))]
+  [(set (pc) (label_ref (match_operand 0 "" "")))]
   ""
-  "b %l0"
+  "b\t%l0"
   [(set_attr "length" "2")]
 )
 
@@ -620,14 +531,14 @@
   [(call (mem (match_operand 0 "immediate_operand" "i"))
          (match_operand 1 "const_int_operand"))]
   ""
-  "bl %0"
+  "bl\t%0"
 )
 
 (define_insn "*vc4_call_indirect"
   [(call (mem:HI (match_operand:SI 0 "register_operand" "r"))
 	 (match_operand 1 "" ""))]
   ""
-  "bl %0"
+  "bl\t%0"
   [(set_attr "length" "2")])
 
 ;; Call a function *with* a return value.
@@ -645,7 +556,7 @@
 	(call (mem (match_operand 1 "immediate_operand" "i"))
 	      (match_operand 2 "const_int_operand")))]
   ""
-  "bl %1"
+  "bl\t%1"
 )
 
 (define_insn "*vc4_call_value_indirect"
@@ -653,7 +564,7 @@
 	(call (mem:HI (match_operand:SI 1 "register_operand" "r"))
 	      (match_operand 2 "" "")))]
   ""
-  "bl %1"
+  "bl\t%1"
   [(set_attr "length" "2")])
 
 (define_expand "untyped_call"
@@ -744,11 +655,11 @@
                     (match_operand:SI 1 "nonmemory_operand" "f,I,r,I,i")))]
   ""
   "@
-  cmp %0, %1 ; fast
-  cmp %0, #%1 ; fast
-  cmp %0, %1
-  cmp %0, #%1
-  cmp %0, #%1 ; largeint"
+  cmp.s\t%0,%1
+  cmp.s\t%0,#%1
+  cmp.m\t%0,%1
+  cmp.m\t%0,#%1
+  cmp.l\t%0,#%1"
   [(set_attr "length" "2,2,4,4,6")]
 )
 
@@ -757,7 +668,7 @@
         (compare:CCFP (match_operand:SF 0 "register_operand" "r")
                       (match_operand:SF 1 "register_operand" "r")))]
   ""
-  "fcmp %0,%1"
+  "fcmp\t%0,%1"
   [(set_attr "length" "4")]
 )
 
@@ -768,7 +679,7 @@
           (label_ref (match_operand 0 "" ""))
           (pc)))]
   ""
-  "b%c1 %0"
+  "b%c1\t%0"
   [(set_attr "length" "4")]
 )
 
