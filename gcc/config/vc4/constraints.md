@@ -53,9 +53,9 @@
 (define_memory_constraint "Us"
   "A memory operand suitable for short-form memory ops."
   (and (match_code "mem")
-       (match_test "vc4_short_form_addr_p (mode, XEXP (op, 0), false)")))
+       (match_test "vc4_short_form_addr_p (mode, XEXP (op, 0), true)")))
 
 (define_memory_constraint "Ul"
   "A memory operand suitable for long-form memory ops."
   (and (match_code "mem")
-       (match_test "vc4_long_form_addr_p (mode, XEXP (op, 0), false)")))
+       (match_test "vc4_long_form_addr_p (mode, XEXP (op, 0), true)")))
