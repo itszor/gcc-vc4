@@ -35,8 +35,23 @@
   (and (match_code "const_int")
        (match_test "IN_RANGE (ival, -32, 31)")))
 
-(define_constraint "K"
-  "A 6-bit unsigned integer in the rand 0 to 63, used by comparison ops."
+(define_constraint "Ks"
+  "A 5-bit integer in the range -31 to 0, used for immediate subtraction."
+  (and (match_code "const_int")
+       (match_test "IN_RANGE (ival, -31, 0)")))
+
+(define_constraint "Kf"
+  "A shiftable 6-bit signed immediate used for immediate addition."
+  (and (match_code "const_int")
+       (match_test "vc4_shiftable_const (ival)")))
+
+(define_constraint "Kg"
+  "A shiftable 6-bit signed immediate used for immediate subtraction."
+  (and (match_code "const_int")
+       (match_test "vc4_shiftable_const (-ival)")))
+
+(define_constraint "Kc"
+  "A 6-bit unsigned integer in the range 0 to 63, used by comparison ops."
   (and (match_code "const_int")
        (match_test "IN_RANGE (ival, 0, 63)")))
 
@@ -49,6 +64,11 @@
   "A signed integer in the range -32768 to 32767, used by 32-bit dyadic ALU ops."
   (and (match_code "const_int")
        (match_test "IN_RANGE (ival, -32768, 32767)")))
+
+(define_constraint "Km"
+  "A signed integer in the range -32767 to 32768, used for immediate subtraction."
+  (and (match_code "const_int")
+       (match_test "IN_RANGE (ival, -32767, 32768)")))
 
 (define_memory_constraint "Us"
   "A memory operand suitable for short-form memory ops."

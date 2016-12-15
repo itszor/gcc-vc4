@@ -185,18 +185,23 @@
 ;   Shifted immediate forms could be added.
 
 (define_insn "addsi3"
-  [(set (match_operand:SI 0 "register_operand"          "=f,f,r,r,r,r")
-	(plus:SI (match_operand:SI 1 "register_operand"  "0,0,r,r,0,r")
-		 (match_operand:SI 2 "nonmemory_operand" "f,I,r,I,i,i")))]
+  [(set (match_operand:SI 0 "register_operand"     "=f,f, f,r, r, r,r, r,r")
+	(plus:SI (match_operand:SI 1 "register_operand"
+						    "0,0, 0,r, r, r,r, 0,r")
+		 (match_operand:SI 2 "nonmemory_operand"
+						    "f,I,Ks,r,Kf,Kg,M,Km,i")))]
   ""
   "@
   add.s\t%0,%2
   add.s\t%0,#%2
+  sub.s\t%0,#%m2
   add.m\t%0,%1,%2
   add.m\t%0,%1,#%2
-  add.l\t%0,#%2
+  sub.m\t%0,%1,#%m2
+  add.m\t%0,%1,#%2
+  sub.m\t%0,#%m2
   add.l\t%0,%1,#%2"
-  [(set_attr "length" "2,2,4,4,6,6")]
+  [(set_attr "length" "2,2,2,4,4,4,4,4,6")]
 )
 
 (define_insn "ashlsi3"
@@ -251,62 +256,66 @@
 )
 
 (define_insn "mulsi3"
-  [(set (match_operand:SI 0 "register_operand"          "=f,f,r,r,r")
-        (mult:SI (match_operand:SI 1 "register_operand"  "0,0,r,r,0")
-                 (match_operand:SI 2 "nonmemory_operand" "f,I,r,I,i")))]
+  [(set (match_operand:SI 0 "register_operand"          "=f,f,r,r,r,r")
+        (mult:SI (match_operand:SI 1 "register_operand"  "0,0,r,r,0,0")
+                 (match_operand:SI 2 "nonmemory_operand" "f,I,r,J,M,i")))]
   ""
   "@
   mul.s\t%0,%2
   mul.s\t%0,#%2
   mul.m\t%0,%1,%2
   mul.m\t%0,%1,#%2
+  mul.m\t%0,#%2
   mul.l\t%0,#%2"
-  [(set_attr "length" "2,2,4,4,6")]
+  [(set_attr "length" "2,2,4,4,4,6")]
 )
 
 ; TODO: Add BCHG immediate.
 
 (define_insn "xorsi3"
-  [(set (match_operand:SI 0 "register_operand"         "=f,r,r,r")
-        (xor:SI (match_operand:SI 1 "register_operand"  "0,r,r,0")
-                (match_operand:SI 2 "nonmemory_operand" "f,r,I,i")))]
+  [(set (match_operand:SI 0 "register_operand"         "=f,r,r,r,r")
+        (xor:SI (match_operand:SI 1 "register_operand"  "0,r,r,0,0")
+                (match_operand:SI 2 "nonmemory_operand" "f,r,J,M,i")))]
   ""
   "@
   eor.s\t%0,%2
   eor.m\t%0,%1,%2
   eor.m\t%0,%1,#%2
+  eor.m\t%0,#%2
   eor.l\t%0,#%2"
-  [(set_attr "length" "2,4,4,6")]
+  [(set_attr "length" "2,4,4,4,6")]
 )
 
 ; TODO: Add BCLR immediate, BIC immediate.
 
 (define_insn "andsi3"
-  [(set (match_operand:SI 0 "register_operand"         "=f,r,r,r")
-        (and:SI (match_operand:SI 1 "register_operand"  "0,r,r,0")
-                (match_operand:SI 2 "nonmemory_operand" "f,r,I,i")))]
+  [(set (match_operand:SI 0 "register_operand"         "=f,r,r,r,r")
+        (and:SI (match_operand:SI 1 "register_operand"  "0,r,r,0,0")
+                (match_operand:SI 2 "nonmemory_operand" "f,r,J,M,i")))]
   ""
   "@
   and.s\t%0,%2
   and.m\t%0,%1,%2
   and.m\t%0,%1,#%2
+  and.m\t%0,#%2
   and.l\t%0,#%2"
-  [(set_attr "length" "2,4,4,6")]
+  [(set_attr "length" "2,4,4,4,6")]
 )
 
 ; TODO: Add BSET immediate.
 
 (define_insn "iorsi3"
-  [(set (match_operand:SI 0 "register_operand"         "=f,r,r,r")
-        (ior:SI (match_operand:SI 1 "register_operand"  "0,r,r,0")
-                (match_operand:SI 2 "nonmemory_operand" "f,r,I,i")))]
+  [(set (match_operand:SI 0 "register_operand"         "=f,r,r,r,r")
+        (ior:SI (match_operand:SI 1 "register_operand"  "0,r,r,0,0")
+                (match_operand:SI 2 "nonmemory_operand" "f,r,J,M,i")))]
   ""
   "@
   or.s\t%0,%2
   or.m\t%0,%1,%2
   or.m\t%0,%1,#%2
+  or.m\t%0,#%2
   or.l\t%0,#%2"
-  [(set_attr "length" "2,4,4,6")]
+  [(set_attr "length" "2,4,4,4,6")]
 )
 
 (define_insn "one_cmplsi2"
@@ -324,21 +333,18 @@
 ;; These ALU instructions are weird and so need special-cased patterns.
 
 (define_insn "subsi3"
-  [(set (match_operand:SI 0 "register_operand"   "=f,f,f,r,r,r,r,r")
+  [(set (match_operand:SI 0 "register_operand"   "=f,f,r,r,r")
 	(minus:SI
-	  (match_operand:SI 1 "register_operand"  "0,0,f,r,I,0,i,r")
-          (match_operand:SI 2 "nonmemory_operand" "I,f,0,I,r,i,0,r")))]
+	  (match_operand:SI 1 "register_operand"  "0,f,J,i,r")
+          (match_operand:SI 2 "nonmemory_operand" "f,0,r,0,r")))]
   ""
   "@
-   sub.s\t%0,#%2
-   sub.s\t%0,%2
-   rsub.s\t%0,%1
-   sub.m\t%0,%1,#%2
-   rsub.m\t%0,%2,#%1
-   sub.l\t%0,#%2
-   rsub.l\t%0,#%1
-   sub.m\t%0,%1,%2"
-  [(set_attr "length" "2,2,2,4,4,6,6,4")]
+  sub.s\t%0,%2
+  rsub.s\t%0,%1
+  rsub.m\t%0,%2,#%1
+  rsub.l\t%0,#%1
+  sub.m\t%0,%1,%2"
+  [(set_attr "length" "2,2,4,6,4")]
 )
 
 (define_insn "divsi3"
@@ -651,16 +657,17 @@
 
 (define_insn "*vc4_test_si"
   [(set (reg:CC CC_REGNO)
-        (compare:CC (match_operand:SI 0 "register_operand"  "f,f,r,r,r")
-                    (match_operand:SI 1 "nonmemory_operand" "f,I,r,I,i")))]
+        (compare:CC (match_operand:SI 0 "register_operand"  "f,f,r,r,r,r")
+                    (match_operand:SI 1 "nonmemory_operand" "f,I,r,J,M,i")))]
   ""
   "@
   cmp.s\t%0,%1
   cmp.s\t%0,#%1
   cmp.m\t%0,%1
   cmp.m\t%0,#%1
+  cmp.m\t%0,#%1
   cmp.l\t%0,#%1"
-  [(set_attr "length" "2,2,4,4,6")]
+  [(set_attr "length" "2,2,4,4,4,6")]
 )
 
 (define_insn "*vc4_test_sf"

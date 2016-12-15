@@ -324,6 +324,11 @@ vc4_print_operand (FILE *stream, rtx x, int code)
         }
         break;
 
+      case 'm':
+        gcc_assert (CONST_INT_P (x));
+	asm_fprintf (stream, "%d", -INTVAL (x));
+        break;
+
       default:
         switch (GET_CODE (x))
           {
@@ -1449,6 +1454,20 @@ static bool
 vc4_legitimate_constant_p(machine_mode mode ATTRIBUTE_UNUSED, rtx x)
 {
     return GET_CODE(x) != CONST_DOUBLE;
+}
+
+bool
+vc4_shiftable_const (HOST_WIDE_INT x)
+{
+  for (int shift = 0; shift <= 8; shift++)
+    {
+      unsigned mask = (1 << shift) - 1;
+      HOST_WIDE_INT shifted = x >> shift;
+      if ((x & mask) == 0 && IN_RANGE (shifted, -32, 31))
+        return true;
+    }
+
+  return false;
 }
 
 /*
