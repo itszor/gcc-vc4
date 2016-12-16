@@ -40,6 +40,11 @@
   (and (match_code "const_int")
        (match_test "exact_log2 ((~ival) & 0xffffffff) != -1")))
 
+(define_constraint "Ims"
+  "A bitmask of N contiguous low-order bits."
+  (and (match_code "const_int")
+       (match_test "ival != 0 && exact_log2 ((ival & 0xffffffff) + 1) != -1")))
+
 (define_constraint "Iu5"
   "A 5-bit unsigned integer in the range 0 to 31, used in short ALU ops."
   (and (match_code "const_int")

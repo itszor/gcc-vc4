@@ -295,23 +295,25 @@
 
 (define_insn "andsi3"
   [(set (match_operand:SI 0 "register_operand"
-					   "=f,  f,r,  r,  r,  r,  r,  r,r")
+				   "=f,  f,  f,r,  r,  r,  r,  r,  r,  r,r")
         (and:SI (match_operand:SI 1 "register_operand"
-					    "0,  0,r,  r,  r,  r,  0,  0,0")
+				    "0,  0,  0,r,  r,  r,  r,  r,  0,  0,0")
                 (match_operand:SI 2 "nonmemory_operand"
-					    "f,Kp2,r,Is6,Ks6,Kp2,IsX,KsX,i")))]
+				    "f,Kp2,Ims,r,Is6,Ks6,Kp2,Ims,IsX,KsX,i")))]
   ""
   "@
   and.s\t%0,%2
   bitclear.s\t%0,#%P2
+  bmask.s\t%0,#%k2
   and.m\t%0,%1,%2
   and.m\t%0,%1,#%2
   bic.m\t%0,%1,#%v2
   bitclear.m\t%0,%1,#%P2
+  bmask.m\t%0,%1,#%k2
   and.m\t%0,#%2
   bic.m\t%0,#%v2
   and.l\t%0,#%2"
-  [(set_attr "length" "2,2,4,4,4,4,4,4,6")]
+  [(set_attr "length" "2,2,2,4,4,4,4,4,4,4,6")]
 )
 
 (define_insn "iorsi3"
