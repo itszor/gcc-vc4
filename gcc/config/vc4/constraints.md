@@ -25,41 +25,56 @@
   "@internal")
 
 ;; Integer constraints.
+(define_constraint "I00"
+  "Integer zero."
+  (and (match_code "const_int")
+       (match_test "ival == 0")))
+
 (define_constraint "Ip2"
   "A power of two."
   (and (match_code "const_int")
-       (match_test "exact_log2 (ival) != -1")))
+       (match_test "exact_log2 (ival & 0xffffffff) != -1")))
 
 (define_constraint "Kp2"
   "A power of two, inverted."
   (and (match_code "const_int")
-       (match_test "exact_log2 (~ival) != -1")))
+       (match_test "exact_log2 ((~ival) & 0xffffffff) != -1")))
 
 (define_constraint "Iu5"
   "A 5-bit unsigned integer in the range 0 to 31, used in short ALU ops."
   (and (match_code "const_int")
        (match_test "IN_RANGE (ival, 0, 31)")))
 
+(define_constraint "Ju5"
+  "A 5-bit integer in the range -31 to 0, used for immediate subtraction."
+  (and (match_code "const_int")
+       (match_test "IN_RANGE (ival, -31, 0)")))
+
+(define_constraint "Ku5"
+  "An inverted 5-bit unsigned integer."
+  (and (match_code "const_int")
+       (match_test "IN_RANGE (~ival, 0, 31)")))
+
 (define_constraint "Is6"
   "An 6-bit signed integer in the range -32 to 31, used in conditional ALU ops."
   (and (match_code "const_int")
        (match_test "IN_RANGE (ival, -32, 31)")))
 
-(define_constraint "Ju5"
-  "A 5-bit integer in the range -31 to 0, used for immediate subtraction."
+(define_constraint "Js6"
+  "An 6-bit signed integer in the range -31 to 32."
   (and (match_code "const_int")
-       (match_test "IN_RANGE (ival, -31, 0)")))
+       (match_test "IN_RANGE (ival, -31, 32)")))
+
+(define_constraint "Ks6"
+  "An 6-bit signed integer in the range -32 to 31, inverted."
+  (and (match_code "const_int")
+       (match_test "IN_RANGE (~ival, -32, 31)")))
 
 (define_constraint "IU5"
   "A 5-bit integer in the range 0 to 31, or the same left-shifted 3 places."
   (and (match_code "const_int")
        (match_test "IN_RANGE (ival, 0, 31)
 		    || ((ival & 7) == 0 && IN_RANGE (ival >> 3, 0, 31))")))
-
-(define_constraint "Ku5"
-  "An inverted 5-bit unsigned integer."
-  (and (match_code "const_int")
-       (match_test "IN_RANGE (~ival, 0, 31)")))
 
 (define_constraint "IS6"
   "A shiftable 6-bit signed immediate used for immediate addition."
@@ -76,11 +91,11 @@
   (and (match_code "const_int")
        (match_test "IN_RANGE (ival, 0, 63)")))
 
-; 'L' for "eleven".
-(define_constraint "IsL"
-  "A signed integer in the range -1024 to 1023, used by index memory ops."
-  (and (match_code "const_int")
-       (match_test "IN_RANGE (ival, -1024, 1023)")))
+; 'L' for "eleven". This isn't actually used, maybe delete it.
+;(define_constraint "IsL"
+;  "A signed integer in the range -1024 to 1023, used by index memory ops."
+;  (and (match_code "const_int")
+;       (match_test "IN_RANGE (ival, -1024, 1023)")))
 
 (define_constraint "IsX"
   "A signed integer in the range -32768 to 32767, used by 32-bit dyadic ALU ops."

@@ -324,26 +324,21 @@ vc4_print_operand (FILE *stream, rtx x, int code)
         }
         break;
 
-      case 'm':
+      case 'v':
         gcc_assert (CONST_INT_P (x));
-	asm_fprintf (stream, "%d", -INTVAL (x));
-        break;
-
-      case 'n':
-        gcc_assert (CONST_INT_P (x));
-	asm_fprintf (stream, "%d", ~INTVAL (x));
+	asm_fprintf (stream, "%wd", ~INTVAL (x));
         break;
 
       case 'p':
       case 'P':
         {
 	  gcc_assert (CONST_INT_P (x));
-	  HOST_WIDE_INT ival;
+	  HOST_WIDE_INT ival = INTVAL (x);
 
           if (code == 'P')
 	    ival = ~ival;
 
-	  asm_fprintf (stream, "%d", exact_log2 (ival));
+	  asm_fprintf (stream, "%wd", exact_log2 (ival & 0xffffffff));
         }
 	break;
 

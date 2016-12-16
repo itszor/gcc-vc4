@@ -71,24 +71,27 @@
 
 (define_insn "*mov<mode>_insn"
   [(set (match_operand:QHSI 0 "nonimmediate_operand"
-				      "=f,  f,f,  r,  r,  r,r,r, f,r, Us,Ul")
+			  "=f,  f,f,  r,  r,  r,  r,  r,  r,r,r, f,r, Us,Ul")
 	(match_operand:QHSI 1 "general_operand"
-				     "IU5,Ku5,f,Iu5,IsX,KsX,i,r,Us,Ul, f, r"))]
+			 "Iu5,Ku5,f,Is6,Js6,Ks6,IsX,JsX,KsX,i,r,Us,Ul, f, r"))]
   ""
   "@
   mov.s\t%0,#%1
-  not.s\t%0,#%n1
+  not.s\t%0,#%v1
   mov.s\t%0,%1
   mov.m\t%0,#%1
-  mov.m\t%0,#%1
-  not.m\t%0,#%n1
+  neg.m\t%0,#%n1
+  not.m\t%0,#%v1
+  mov.m\t%0,#%1\t; non-predicable
+  neg.m\t%0,#%n1\t; non-predicable
+  not.m\t%0,#%v1\t; non-predicable
   mov.l\t%0,#%1
   mov.m\t%0,%1
   ld<suffix>.s\t%0,%1
   ld<suffix>.l\t%0,%1
   st<suffix>.s\t%1,%0
   st<suffix>.l\t%1,%0"
-  [(set_attr "length" "2,2,2,4,4,4,6,4,2,6,2,6")]
+  [(set_attr "length" "2,2,2,4,4,4,4,4,4,6,4,2,6,2,6")]
 )
 
 ;; pushes/pops.
@@ -190,17 +193,17 @@
 	(plus:SI (match_operand:SI 1 "register_operand"
 					    "0,  0,  0,r,  r,  r,  r,  0,r")
 		 (match_operand:SI 2 "nonmemory_operand"
-					    "f,Iu5,Ju5,r,IS6,JS6,IsX,JsX,i")))]
+					    "f,IU5,Ju5,r,IS6,JS6,IsX,JsX,i")))]
   ""
   "@
   add.s\t%0,%2
   add.s\t%0,#%2
-  sub.s\t%0,#%m2
+  sub.s\t%0,#%n2
   add.m\t%0,%1,%2
   add.m\t%0,%1,#%2
-  sub.m\t%0,%1,#%m2
+  sub.m\t%0,%1,#%n2
   add.m\t%0,%1,#%2
-  sub.m\t%0,#%m2
+  sub.m\t%0,#%n2
   add.l\t%0,%1,#%2"
   [(set_attr "length" "2,2,2,4,4,4,4,4,6")]
 )
@@ -303,10 +306,10 @@
   bitclear.s\t%0,#%P2
   and.m\t%0,%1,%2
   and.m\t%0,%1,#%2
-  bic.m\t%0,%1,#%n2
+  bic.m\t%0,%1,#%v2
   bitclear.m\t%0,%1,#%P2
   and.m\t%0,#%2
-  bic.m\t%0,#%n2
+  bic.m\t%0,#%v2
   and.l\t%0,#%2"
   [(set_attr "length" "2,2,4,4,4,4,4,4,6")]
 )
@@ -326,7 +329,7 @@
   bitset.m\t%0,%1,#%p2
   or.m\t%0,#%2
   or.l\t%0,#%2"
-  [(set_attr "length" "2,4,4,4,6")]
+  [(set_attr "length" "2,2,4,4,4,4,6")]
 )
 
 (define_insn "one_cmplsi2"
@@ -339,23 +342,20 @@
   [(set_attr "length" "2,4")]
 )
 
-;; --- Special-cased arithmetic ---------------------------------------------
-
-;; These ALU instructions are weird and so need special-cased patterns.
-
 (define_insn "subsi3"
-  [(set (match_operand:SI 0 "register_operand"   "=f,f,  r,r,r")
+  [(set (match_operand:SI 0 "register_operand"   "=f,  f,f,  r,r,r")
 	(minus:SI
-	  (match_operand:SI 1 "nonmemory_operand" "0,f,Is6,i,r")
-          (match_operand:SI 2 "register_operand"  "f,0,  r,0,r")))]
+	  (match_operand:SI 1 "nonmemory_operand" "0,I00,f,Is6,i,r")
+          (match_operand:SI 2 "register_operand"  "f,  f,0,  r,0,r")))]
   ""
   "@
   sub.s\t%0,%2
+  neg.s\t%0,%2
   rsub.s\t%0,%1
   rsub.m\t%0,%2,#%1
   rsub.l\t%0,#%1
   sub.m\t%0,%1,%2"
-  [(set_attr "length" "2,2,4,6,4")]
+  [(set_attr "length" "2,2,2,4,6,4")]
 )
 
 (define_insn "divsi3"
