@@ -66,14 +66,11 @@
 
 ;; --- Generic moves --------------------------------------------------------
 
-; TODO: we can add,
-;   32-bit ld/st variants.
-
 (define_insn "*mov<mode>_insn"
   [(set (match_operand:QHSI 0 "nonimmediate_operand"
-			  "=f,  f,f,  r,  r,  r,  r,  r,  r,r,r, f,r, Us,Ul")
+	       "=f,  f,f,  r,  r,  r,  r,  r,  r,r,r, f, r, r,r, Us,Uc,Ud,Ul")
 	(match_operand:QHSI 1 "general_operand"
-			 "Iu5,Ku5,f,Is6,Js6,Ks6,IsX,JsX,KsX,i,r,Us,Ul, f, r"))]
+	      "Iu5,Ku5,f,Is6,Js6,Ks6,IsX,JsX,KsX,i,r,Us,Uc,Ud,Ul, f, r, r, r"))]
   ""
   "@
   mov.s\t%0,#%1
@@ -88,10 +85,14 @@
   mov.l\t%0,#%1
   mov.m\t%0,%1
   ld<suffix>.s\t%0,%1
+  ld<suffix>.m\t%0,%1
+  ld<suffix>.m\t%0,%1
   ld<suffix>.l\t%0,%1
   st<suffix>.s\t%1,%0
+  st<suffix>.m\t%1,%0
+  st<suffix>.m\t%1,%0
   st<suffix>.l\t%1,%0"
-  [(set_attr "length" "2,2,2,4,4,4,4,4,4,6,4,2,6,2,6")]
+  [(set_attr "length" "2,2,2,4,4,4,4,4,4,6,4,2,4,4,6,2,4,4,6")]
 )
 
 ;; pushes/pops.

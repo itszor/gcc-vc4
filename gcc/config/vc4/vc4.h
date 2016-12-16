@@ -350,7 +350,7 @@ extern const enum reg_class vc4_regno_reg_class[FIRST_PSEUDO_REGISTER];
   ((REGNO) < FIRST_PSEUDO_REGISTER ? vc4_regno_reg_class[REGNO] : NO_REGS)
 
 /* The class value for index registers, and the one for base regs.  */
-#define INDEX_REG_CLASS  NO_REGS
+#define INDEX_REG_CLASS  GENERAL_REGS
 #define BASE_REG_CLASS	 GENERAL_REGS
 
 /* Return the maximum number of consecutive registers

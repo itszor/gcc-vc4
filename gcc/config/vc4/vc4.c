@@ -224,8 +224,18 @@ vc4_print_operand_address (FILE *stream, rtx x)
 	asm_fprintf (stream, "(%r+%d)", REGNO (XEXP (x, 0)),
                      (int) INTVAL (XEXP (x, 1)));
       else if (REG_P (XEXP (x, 0)) && REG_P (XEXP (x, 1)))
-        asm_fprintf (stream, "(%r, %r)", REGNO (XEXP (x, 0)),
+        asm_fprintf (stream, "(%r+%r)", REGNO (XEXP (x, 0)),
 		     REGNO (XEXP (x, 1)));
+      else if (GET_CODE (XEXP (x, 0)) == MULT
+	       && REG_P (XEXP (XEXP (x, 0), 0))
+	       && CONST_INT_P (XEXP (XEXP (x, 0), 1))
+	       && REG_P (XEXP (x, 1)))
+	{
+	  HOST_WIDE_INT scale = INTVAL (XEXP (XEXP (x, 0), 1));
+	  asm_fprintf (stream, "(%r+%r<<%wd)", REGNO (XEXP (x, 1)),
+		       REGNO (XEXP (XEXP (x, 0), 0)),
+		       exact_log2 (INTVAL (XEXP (XEXP (x, 0), 1))));
+	}
       else
         output_operand_lossage ("invalid PLUS operand");
       break;
@@ -439,13 +449,13 @@ vc4_target_rtx_costs (rtx x, machine_mode mode, int outer_code ATTRIBUTE_UNUSED,
 /*
  * Code to generate prologue and epilogue sequences.  
  */
-static int number_of_regs_before_varargs;
+//static int number_of_regs_before_varargs;
 
 /*
  * Set by TARGET_SETUP_INCOMING_VARARGS to indicate to prolog that this is
  * for a varargs function.  
  */
-static int current_function_anonymous_args;
+//static int current_function_anonymous_args;
 
 /* Calculates the offset needed to convert accesses to the specified register
    to instead be an access to the stack pointer.  */
@@ -562,8 +572,7 @@ num_arg_regs (machine_mode mode, const_tree type)
 
 static void
 vc4_setup_incoming_varargs (cumulative_args_t args_so_far_v,
-                            machine_mode mode, tree type,
-                            int *ptr_pretend_size,
+                            machine_mode, tree, int *ptr_pretend_size,
                             int second_time ATTRIBUTE_UNUSED)
 {
   CUMULATIVE_ARGS *args_so_far = get_cumulative_args (args_so_far_v);
@@ -1206,7 +1215,7 @@ vc4_arg_partial_bytes (cumulative_args_t cum, machine_mode mode,
 }
 
 void
-vc4_set_return_address (rtx source, rtx scratch)
+vc4_set_return_address (rtx source, rtx scratch ATTRIBUTE_UNUSED)
 {
   struct machine_function *offsets = vc4_compute_frame ();
   if (!offsets->lrneedssaving)
@@ -1364,6 +1373,23 @@ vc4_sp_regno_p (int regno, bool strict_p)
 }
 
 static bool
+vc4_limited_base_regno_p (int regno, bool strict_p)
+{
+  if (regno >= FIRST_PSEUDO_REGISTER)
+    {
+      if (!strict_p)
+        return true;
+
+      if (!reg_renumber)
+        return false;
+
+      regno = reg_renumber[regno];
+    }
+
+  return regno == 0 || regno == GP_REG || regno == SP_REG || regno == PC_REG;
+}
+
+static bool
 vc4_fast_address_register_p (rtx x, bool strict_p)
 {
   if (GET_CODE (x) == SUBREG)
@@ -1373,6 +1399,37 @@ vc4_fast_address_register_p (rtx x, bool strict_p)
     return false;
   
   return vc4_regno_ok_for_fast_base_p (REGNO (x), strict_p);
+}
+
+static bool
+vc4_scaled_index_addr_p (machine_mode mode, rtx x, bool strict_p)
+{
+  switch (GET_MODE_SIZE (mode))
+    {
+    case 1:
+      if (GET_CODE (x) == PLUS
+	  && vc4_address_register_p (XEXP (x, 0), strict_p)
+	  && vc4_address_register_p (XEXP (x, 1), strict_p))
+	return true;
+      break;
+
+    case 2:
+    case 4:
+      if (GET_CODE (x) == PLUS
+          && GET_CODE (XEXP (x, 0)) == MULT
+	  && vc4_address_register_p (XEXP (XEXP (x, 0), 0), strict_p)
+	  && GET_CODE (XEXP (XEXP (x, 0), 1)) == CONST_INT
+	  && INTVAL (XEXP (XEXP (x, 0), 1)) == GET_MODE_SIZE (mode)
+	  && vc4_address_register_p (XEXP (x, 1), strict_p))
+	return true;
+      break;
+
+    default:
+      ;
+    }
+
+  return false;
+
 }
 
 static bool
@@ -1392,7 +1449,8 @@ vc4_legitimate_address_p_1 (machine_mode mode ATTRIBUTE_UNUSED, rtx x,
       && INTVAL (XEXP (x, 1)) < 0x4000000)
     return true;
 
-  /* !!! (reg, reg) addressing also appears to be available.  */
+  if (vc4_scaled_index_addr_p (mode, x, strict))
+    return true;
 
   return false;
 }
@@ -1449,7 +1507,45 @@ vc4_short_form_addr_p (machine_mode mode, rtx x, bool strict_p)
 }
 
 bool
-vc4_long_form_addr_p (machine_mode mode, rtx x, bool strict_p)
+vc4_conditional_form_addr_p (machine_mode mode, rtx x, bool strict_p)
+{
+  if (vc4_scaled_index_addr_p (mode, x, strict_p))
+    return true;
+
+  /* We can also support pre-decrement/post-increment here.  */
+
+  return false;
+}
+
+bool
+vc4_displacement_form_addr_p (machine_mode mode ATTRIBUTE_UNUSED, rtx x,
+			      bool strict_p)
+{
+  if (vc4_address_register_p (x, strict_p))
+    return true;
+
+  /* 12-bit displacement forms.  */
+  if (GET_CODE (x) == PLUS
+      && vc4_address_register_p (XEXP (x, 0), strict_p)
+      && GET_CODE (XEXP (x, 1)) == CONST_INT
+      && INTVAL (XEXP (x, 1)) >= -2048
+      && INTVAL (XEXP (x, 1)) < 2048)
+    return true;
+
+  /* 16-bit displacement forms.  */
+  if (GET_CODE (x) == PLUS
+      && REG_P (XEXP (x, 0))
+      && vc4_limited_base_regno_p (REGNO (XEXP (x, 0)), strict_p)
+      && GET_CODE (XEXP (x, 1)) == CONST_INT
+      && INTVAL (XEXP (x, 1)) >= -32768
+      && INTVAL (XEXP (x, 1)) < 32768)
+    return true;
+
+  return false;
+}
+
+bool
+vc4_long_form_addr_p (machine_mode mode ATTRIBUTE_UNUSED, rtx x, bool strict_p)
 {
   if (CONSTANT_P (x))
     return GET_CODE (x) == SYMBOL_REF
@@ -1459,7 +1555,20 @@ vc4_long_form_addr_p (machine_mode mode, rtx x, bool strict_p)
 	       && (GET_CODE (XEXP (XEXP (x, 0), 0)) == SYMBOL_REF
 		   || GET_CODE (XEXP (XEXP (x, 0), 0)) == LABEL_REF));
 
-  return vc4_legitimate_address_p (mode, x, strict_p);
+  if (CONSTANT_ADDRESS_P (x))
+    return true;
+
+  if (vc4_address_register_p (x, strict_p))
+    return true;
+
+  if (GET_CODE (x) == PLUS
+      && vc4_address_register_p (XEXP (x, 0), strict_p)
+      && GET_CODE (XEXP (x, 1)) == CONST_INT
+      && INTVAL (XEXP (x, 1)) >= -0x4000000
+      && INTVAL (XEXP (x, 1)) < 0x4000000)
+    return true;
+
+  return false;
 }
 
 /*
@@ -1468,11 +1577,11 @@ vc4_long_form_addr_p (machine_mode mode, rtx x, bool strict_p)
  * On the VC4, allow anything but a double.  
  */
 
-static bool
+/*static bool
 vc4_legitimate_constant_p(machine_mode mode ATTRIBUTE_UNUSED, rtx x)
 {
     return GET_CODE(x) != CONST_DOUBLE;
-}
+}*/
 
 bool
 vc4_shiftable_const (HOST_WIDE_INT x)

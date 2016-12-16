@@ -122,6 +122,16 @@
   (and (match_code "mem")
        (match_test "vc4_short_form_addr_p (mode, XEXP (op, 0), true)")))
 
+(define_memory_constraint "Uc"
+  "A memory operand suitable for conditional memory ops."
+  (and (match_code "mem")
+       (match_test "vc4_conditional_form_addr_p (mode, XEXP (op, 0), true)")))
+
+(define_memory_constraint "Ud"
+  "A memory operand suitable for 32-bit displacement-form memory ops."
+  (and (match_code "mem")
+       (match_test "vc4_displacement_form_addr_p (mode, XEXP (op, 0), true)")))
+
 (define_memory_constraint "Ul"
   "A memory operand suitable for long-form memory ops."
   (and (match_code "mem")
