@@ -67,24 +67,28 @@
 ;; --- Generic moves --------------------------------------------------------
 
 ; TODO: we can add,
-;   not rN,#imm (short form, inverted immediate 0-31).
 ;   32-bit ld/st variants.
 
 (define_insn "*mov<mode>_insn"
-  [(set (match_operand:QHSI 0 "nonimmediate_operand" "=f,f,r,r,r, f,r, Us,Ul")
-	(match_operand:QHSI 1 "general_operand"	      "I,f,I,i,r,Us,Ul, f, r"))]
+  [(set (match_operand:QHSI 0 "nonimmediate_operand"
+				      "=f,  f,f,  r,  r,  r,r,r, f,r, Us,Ul")
+	(match_operand:QHSI 1 "general_operand"
+				     "IU5,Ku5,f,Iu5,IsX,KsX,i,r,Us,Ul, f, r"))]
   ""
   "@
   mov.s\t%0,#%1
+  not.s\t%0,#%n1
   mov.s\t%0,%1
   mov.m\t%0,#%1
+  mov.m\t%0,#%1
+  not.m\t%0,#%n1
   mov.l\t%0,#%1
   mov.m\t%0,%1
   ld<suffix>.s\t%0,%1
   ld<suffix>.l\t%0,%1
   st<suffix>.s\t%1,%0
   st<suffix>.l\t%1,%0"
-  [(set_attr "length" "2,2,4,6,4,2,6,2,6")]
+  [(set_attr "length" "2,2,2,4,4,4,6,4,2,6,2,6")]
 )
 
 ;; pushes/pops.
@@ -178,18 +182,15 @@
 ;; --- Generic arithmetic ---------------------------------------------------
 
 ; Here:
-;   "I" could perhaps be "J" (6-bit signed vs. 5-bit unsigned immediates).
 ;   LEA forms could be explicitly supported.
-;   32-bit dyadic (16-bit immediate) ops could be added.
-;   Immediate subtract forms could be added.
-;   Shifted immediate forms could be added.
 
 (define_insn "addsi3"
-  [(set (match_operand:SI 0 "register_operand"     "=f,f, f,r, r, r,r, r,r")
+  [(set (match_operand:SI 0 "register_operand"
+					   "=f,  f,  f,r,  r,  r,  r,  r,r")
 	(plus:SI (match_operand:SI 1 "register_operand"
-						    "0,0, 0,r, r, r,r, 0,r")
+					    "0,  0,  0,r,  r,  r,  r,  0,r")
 		 (match_operand:SI 2 "nonmemory_operand"
-						    "f,I,Ks,r,Kf,Kg,M,Km,i")))]
+					    "f,Iu5,Ju5,r,IS6,JS6,IsX,JsX,i")))]
   ""
   "@
   add.s\t%0,%2
@@ -205,9 +206,9 @@
 )
 
 (define_insn "ashlsi3"
-  [(set (match_operand:SI 0 "register_operand"            "=f,f,r,r")
-	(ashift:SI (match_operand:SI 1 "register_operand"  "0,0,r,r")
-		   (match_operand:SI 2 "nonmemory_operand" "f,I,r,I")))]
+  [(set (match_operand:SI 0 "register_operand"            "=f,  f,r,  r")
+	(ashift:SI (match_operand:SI 1 "register_operand"  "0,  0,r,  r")
+		   (match_operand:SI 2 "nonmemory_operand" "f,Iu5,r,Iu5")))]
   ""
   "@
   shl.s\t%0,%2
@@ -218,9 +219,9 @@
 )
 
 (define_insn "ashrsi3"
-  [(set (match_operand:SI 0 "register_operand"              "=f,f,r,r")
-	(ashiftrt:SI (match_operand:SI 1 "register_operand"  "0,0,r,r")
-		     (match_operand:SI 2 "nonmemory_operand" "f,I,r,I")))]
+  [(set (match_operand:SI 0 "register_operand"              "=f,  f,r,  r")
+	(ashiftrt:SI (match_operand:SI 1 "register_operand"  "0,  0,r,  r")
+		     (match_operand:SI 2 "nonmemory_operand" "f,Iu5,r,Iu5")))]
   ""
   "@
   asr.s\t%0,%2
@@ -231,9 +232,9 @@
 )
 
 (define_insn "lshrsi3"
-  [(set (match_operand:SI 0 "register_operand"              "=f,f,r,r")
-	(lshiftrt:SI (match_operand:SI 1 "register_operand"  "0,0,r,r")
-		     (match_operand:SI 2 "nonmemory_operand" "f,I,r,I")))]
+  [(set (match_operand:SI 0 "register_operand"              "=f,  f,r,  r")
+	(lshiftrt:SI (match_operand:SI 1 "register_operand"  "0,  0,r,  r")
+		     (match_operand:SI 2 "nonmemory_operand" "f,Iu5,r,Iu5")))]
   ""
   "@
   lsr.s\t%0,%2
@@ -244,9 +245,9 @@
 )
 
 (define_insn "rotrsi3"
-  [(set (match_operand:SI 0 "register_operand"              "=f,r,r")
-	(rotatert:SI (match_operand:SI 1 "register_operand"  "0,r,r")
-		     (match_operand:SI 2 "nonmemory_operand" "f,r,I")))]
+  [(set (match_operand:SI 0 "register_operand"              "=f,r,  r")
+	(rotatert:SI (match_operand:SI 1 "register_operand"  "0,r,  r")
+		     (match_operand:SI 2 "nonmemory_operand" "f,r,Iu5")))]
   ""
   "@
   ror.s\t%0,%2
@@ -256,9 +257,10 @@
 )
 
 (define_insn "mulsi3"
-  [(set (match_operand:SI 0 "register_operand"          "=f,f,r,r,r,r")
-        (mult:SI (match_operand:SI 1 "register_operand"  "0,0,r,r,0,0")
-                 (match_operand:SI 2 "nonmemory_operand" "f,I,r,J,M,i")))]
+  [(set (match_operand:SI 0 "register_operand"         "=f,  f,r,  r,  r,r")
+        (mult:SI (match_operand:SI 1 "register_operand" "0,  0,r,  r,  0,0")
+                 (match_operand:SI 2 "nonmemory_operand"
+							"f,Iu5,r,Is6,IsX,i")))]
   ""
   "@
   mul.s\t%0,%2
@@ -270,49 +272,58 @@
   [(set_attr "length" "2,2,4,4,4,6")]
 )
 
-; TODO: Add BCHG immediate.
-
 (define_insn "xorsi3"
-  [(set (match_operand:SI 0 "register_operand"         "=f,r,r,r,r")
-        (xor:SI (match_operand:SI 1 "register_operand"  "0,r,r,0,0")
-                (match_operand:SI 2 "nonmemory_operand" "f,r,J,M,i")))]
+  [(set (match_operand:SI 0 "register_operand"      "=f,  f,r,  r,  r,  r,r")
+        (xor:SI (match_operand:SI 1 "register_operand"
+						     "0,  0,r,  r,  r,  0,0")
+                (match_operand:SI 2 "nonmemory_operand"
+						     "f,Ip2,r,Ip2,Is6,IsX,i")))]
   ""
   "@
   eor.s\t%0,%2
+  bitflip.s\t%0,#%p2
   eor.m\t%0,%1,%2
+  bitflip.m\t%0,%1,#%p2
   eor.m\t%0,%1,#%2
   eor.m\t%0,#%2
   eor.l\t%0,#%2"
-  [(set_attr "length" "2,4,4,4,6")]
+  [(set_attr "length" "2,2,4,4,4,4,6")]
 )
 
-; TODO: Add BCLR immediate, BIC immediate.
-
 (define_insn "andsi3"
-  [(set (match_operand:SI 0 "register_operand"         "=f,r,r,r,r")
-        (and:SI (match_operand:SI 1 "register_operand"  "0,r,r,0,0")
-                (match_operand:SI 2 "nonmemory_operand" "f,r,J,M,i")))]
+  [(set (match_operand:SI 0 "register_operand"
+					   "=f,  f,r,  r,  r,  r,  r,  r,r")
+        (and:SI (match_operand:SI 1 "register_operand"
+					    "0,  0,r,  r,  r,  r,  0,  0,0")
+                (match_operand:SI 2 "nonmemory_operand"
+					    "f,Kp2,r,Is6,Ks6,Kp2,IsX,KsX,i")))]
   ""
   "@
   and.s\t%0,%2
+  bitclear.s\t%0,#%P2
   and.m\t%0,%1,%2
   and.m\t%0,%1,#%2
+  bic.m\t%0,%1,#%n2
+  bitclear.m\t%0,%1,#%P2
   and.m\t%0,#%2
+  bic.m\t%0,#%n2
   and.l\t%0,#%2"
-  [(set_attr "length" "2,4,4,4,6")]
+  [(set_attr "length" "2,2,4,4,4,4,4,4,6")]
 )
 
-; TODO: Add BSET immediate.
-
 (define_insn "iorsi3"
-  [(set (match_operand:SI 0 "register_operand"         "=f,r,r,r,r")
-        (ior:SI (match_operand:SI 1 "register_operand"  "0,r,r,0,0")
-                (match_operand:SI 2 "nonmemory_operand" "f,r,J,M,i")))]
+  [(set (match_operand:SI 0 "register_operand"      "=f,  f,r,  r,  r,  r,r")
+        (ior:SI (match_operand:SI 1 "register_operand"
+						     "0,  0,r,  r,  r,  0,0")
+                (match_operand:SI 2 "nonmemory_operand"
+						     "f,Ip2,r,Is6,Ip2,IsX,i")))]
   ""
   "@
   or.s\t%0,%2
+  bitset.s\t%0,#%p2
   or.m\t%0,%1,%2
   or.m\t%0,%1,#%2
+  bitset.m\t%0,%1,#%p2
   or.m\t%0,#%2
   or.l\t%0,#%2"
   [(set_attr "length" "2,4,4,4,6")]
@@ -333,10 +344,10 @@
 ;; These ALU instructions are weird and so need special-cased patterns.
 
 (define_insn "subsi3"
-  [(set (match_operand:SI 0 "register_operand"   "=f,f,r,r,r")
+  [(set (match_operand:SI 0 "register_operand"   "=f,f,  r,r,r")
 	(minus:SI
-	  (match_operand:SI 1 "register_operand"  "0,f,J,i,r")
-          (match_operand:SI 2 "nonmemory_operand" "f,0,r,0,r")))]
+	  (match_operand:SI 1 "nonmemory_operand" "0,f,Is6,i,r")
+          (match_operand:SI 2 "register_operand"  "f,0,  r,0,r")))]
   ""
   "@
   sub.s\t%0,%2
@@ -348,9 +359,9 @@
 )
 
 (define_insn "divsi3"
-  [(set (match_operand:SI 0 "register_operand"         "=r,r")
-	(div:SI (match_operand:SI 1 "register_operand"  "r,r")
-        	(match_operand:SI 2 "nonmemory_operand" "r,J")))]
+  [(set (match_operand:SI 0 "register_operand"         "=r,  r")
+	(div:SI (match_operand:SI 1 "register_operand"  "r,  r")
+        	(match_operand:SI 2 "nonmemory_operand" "r,Is6")))]
   ""
   "@
   div.ss\t%0,%1,%2
@@ -359,9 +370,9 @@
 )
 
 (define_insn "udivsi3"
-  [(set (match_operand:SI 0 "register_operand"          "=r,r")
-	(udiv:SI (match_operand:SI 1 "register_operand"  "r,r")
-        	 (match_operand:SI 2 "nonmemory_operand" "r,J")))]
+  [(set (match_operand:SI 0 "register_operand"          "=r,  r")
+	(udiv:SI (match_operand:SI 1 "register_operand"  "r,  r")
+        	 (match_operand:SI 2 "nonmemory_operand" "r,Is6")))]
   ""
   "@
   div.uu\t%0,%1,%2
@@ -657,8 +668,10 @@
 
 (define_insn "*vc4_test_si"
   [(set (reg:CC CC_REGNO)
-        (compare:CC (match_operand:SI 0 "register_operand"  "f,f,r,r,r,r")
-                    (match_operand:SI 1 "nonmemory_operand" "f,I,r,J,M,i")))]
+        (compare:CC (match_operand:SI 0 "register_operand"
+							"f,  f,r,  r,  r,r")
+                    (match_operand:SI 1 "nonmemory_operand"
+							"f,Iu5,r,Is6,IsX,i")))]
   ""
   "@
   cmp.s\t%0,%1
