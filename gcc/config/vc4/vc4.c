@@ -186,7 +186,7 @@ vc4_target_register_move_cost (machine_mode mode ATTRIBUTE_UNUSED,
  * Compute extra cost (over TARGET_REGISTER_MOVE_COST) to do memory
  * indirections. Slow registers are slow. 
  */
-static int
+/*static int
 vc4_target_memory_move_cost (machine_mode mode ATTRIBUTE_UNUSED,
 			     reg_class_t rclass, bool in ATTRIBUTE_UNUSED)
 {
@@ -194,23 +194,23 @@ vc4_target_memory_move_cost (machine_mode mode ATTRIBUTE_UNUSED,
     return 0;
 
   return 2;
-}
+}*/
 
 /*
  * Compute extra cost (over TARGET_REGISTER_MOVE_COST) for an addressing
  * mode. On the VC4, all addressing modes cost the same. 
  */
-static int
+/*static int
 vc4_target_address_cost (rtx address ATTRIBUTE_UNUSED,
 			 machine_mode mode ATTRIBUTE_UNUSED,
                          addr_space_t as ATTRIBUTE_UNUSED,
 			 bool speed ATTRIBUTE_UNUSED)
 {
   return 0;
-}
+}*/
 
 static void
-vc4_print_operand_address (FILE *stream, rtx x)
+vc4_print_operand_address (FILE *stream, machine_mode /*mode*/, rtx x)
 {
   switch (GET_CODE (x))
     {
@@ -230,12 +230,9 @@ vc4_print_operand_address (FILE *stream, rtx x)
 	       && REG_P (XEXP (XEXP (x, 0), 0))
 	       && CONST_INT_P (XEXP (XEXP (x, 0), 1))
 	       && REG_P (XEXP (x, 1)))
-	{
-	  HOST_WIDE_INT scale = INTVAL (XEXP (XEXP (x, 0), 1));
-	  asm_fprintf (stream, "(%r+%r<<%wd)", REGNO (XEXP (x, 1)),
-		       REGNO (XEXP (XEXP (x, 0), 0)),
-		       exact_log2 (INTVAL (XEXP (XEXP (x, 0), 1))));
-	}
+	asm_fprintf (stream, "(%r+%r<<%wd)", REGNO (XEXP (x, 1)),
+		     REGNO (XEXP (XEXP (x, 0), 0)),
+		     exact_log2 (INTVAL (XEXP (XEXP (x, 0), 1))));
       else
         output_operand_lossage ("invalid PLUS operand");
       break;
@@ -364,7 +361,7 @@ vc4_print_operand (FILE *stream, rtx x, int code)
             asm_fprintf (stream, "%r", REGNO (x));
             break;
           case MEM:
-            vc4_print_operand_address (stream, XEXP (x, 0));
+            vc4_print_operand_address (stream, GET_MODE (x), XEXP (x, 0));
             break;
           default:
             output_addr_const (stream, x);
@@ -1174,7 +1171,7 @@ vc4_function_arg_advance (cumulative_args_t cum_v, machine_mode mode,
 }
 
 static unsigned int
-vc4_function_arg_boundary (machine_mode mode, const_tree type ATTRIBUTE_UNUSED)
+vc4_function_arg_boundary (machine_mode /*mode*/, const_tree /*type*/)
 {
   return PARM_BOUNDARY;
 }
