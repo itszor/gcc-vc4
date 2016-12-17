@@ -22,6 +22,8 @@
 ;;- See file "rtl.def" for documentation on define_insn, match_*, et. al.
 
 (define_attr "length" "" (const_int 2))
+(define_attr "enabled" "no,yes" (const_string "yes"))
+(define_attr "predicable" "no,yes" (const_string "no"))
 
 (include "predicates.md")
 (include "constraints.md")
@@ -76,23 +78,25 @@
   mov.s\t%0,#%1
   not.s\t%0,#%v1
   mov.s\t%0,%1
-  mov.m\t%0,#%1
-  neg.m\t%0,#%n1
-  not.m\t%0,#%v1
+  mov%?.m\t%0,#%1
+  neg%?.m\t%0,#%n1
+  not%?.m\t%0,#%v1
   mov.m\t%0,#%1\t; non-predicable
   neg.m\t%0,#%n1\t; non-predicable
   not.m\t%0,#%v1\t; non-predicable
   mov.l\t%0,#%1
-  mov.m\t%0,%1
+  mov%?.m\t%0,%1
   ld<suffix>.s\t%0,%1
-  ld<suffix>.m\t%0,%1
+  ld<suffix>%?.m\t%0,%1
   ld<suffix>.m\t%0,%1
   ld<suffix>.l\t%0,%1
   st<suffix>.s\t%1,%0
-  st<suffix>.m\t%1,%0
+  st<suffix>%?.m\t%1,%0
   st<suffix>.m\t%1,%0
   st<suffix>.l\t%1,%0"
-  [(set_attr "length" "2,2,2,4,4,4,4,4,4,6,4,2,4,4,6,2,4,4,6")]
+  [(set_attr "length" "2,2,2,4,4,4,4,4,4,6,4,2,4,4,6,2,4,4,6")
+   (set_attr "predicable"
+     "no,no,no,yes,yes,yes,no,no,no,no,yes,no,yes,no,no,no,yes,no,no")]
 )
 
 ;; pushes/pops.
@@ -200,14 +204,16 @@
   add.s\t%0,%2
   add.s\t%0,#%2
   sub.s\t%0,#%n2
-  add.m\t%0,%1,%2
-  add.m\t%0,%1,#%2
-  sub.m\t%0,%1,#%n2
+  add%?.m\t%0,%1,%2
+  add%?.m\t%0,%1,#%2
+  sub%?.m\t%0,%1,#%n2
   add.m\t%0,%1,#%2
   sub.m\t%0,#%n2
   add.l\t%0,%1,#%2"
-  [(set_attr "length" "2,2,2,4,4,4,4,4,6")]
+  [(set_attr "length" "2,2,2,4,4,4,4,4,6")
+   (set_attr "predicable" "no,no,no,yes,yes,yes,no,no,no")]
 )
+
 
 (define_insn "ashlsi3"
   [(set (match_operand:SI 0 "register_operand"            "=f,  f,r,  r")
@@ -217,9 +223,10 @@
   "@
   shl.s\t%0,%2
   shl.s\t%0,#%2
-  shl.m\t%0,%1,%2
-  shl.m\t%0,%1,#%2"
-  [(set_attr "length" "2,2,4,4")]
+  shl%?.m\t%0,%1,%2
+  shl%?.m\t%0,%1,#%2"
+  [(set_attr "length" "2,2,4,4")
+   (set_attr "predicable" "no,no,yes,yes")]
 )
 
 (define_insn "ashrsi3"
@@ -230,9 +237,10 @@
   "@
   asr.s\t%0,%2
   asr.s\t%0,#%2
-  asr.m\t%0,%1,%2
-  asr.m\t%0,%1,#%2"
-  [(set_attr "length" "2,2,4,4")]
+  asr%?.m\t%0,%1,%2
+  asr%?.m\t%0,%1,#%2"
+  [(set_attr "length" "2,2,4,4")
+   (set_attr "predicable" "no,no,yes,yes")]
 )
 
 (define_insn "lshrsi3"
@@ -243,9 +251,10 @@
   "@
   lsr.s\t%0,%2
   lsr.s\t%0,#%2
-  lsr.m\t%0,%1,%2
-  lsr.m\t%0,%1,#%2"
-  [(set_attr "length" "2,2,4,4")]
+  lsr%?.m\t%0,%1,%2
+  lsr%?.m\t%0,%1,#%2"
+  [(set_attr "length" "2,2,4,4")
+   (set_attr "predicable" "no,no,yes,yes")]
 )
 
 (define_insn "rotrsi3"
@@ -255,9 +264,10 @@
   ""
   "@
   ror.s\t%0,%2
-  ror.m\t%0,%1,%2
-  ror.m\t%0,%1,#%2"
-  [(set_attr "length" "2,4,4")]
+  ror%?.m\t%0,%1,%2
+  ror%?.m\t%0,%1,#%2"
+  [(set_attr "length" "2,4,4")
+   (set_attr "predicable" "no,yes,yes")]
 )
 
 (define_insn "mulsi3"
@@ -269,11 +279,12 @@
   "@
   mul.s\t%0,%2
   mul.s\t%0,#%2
-  mul.m\t%0,%1,%2
-  mul.m\t%0,%1,#%2
+  mul%?.m\t%0,%1,%2
+  mul%?.m\t%0,%1,#%2
   mul.m\t%0,#%2
   mul.l\t%0,#%2"
-  [(set_attr "length" "2,2,4,4,4,6")]
+  [(set_attr "length" "2,2,4,4,4,6")
+   (set_attr "predicable" "no,no,yes,yes,no,no")]
 )
 
 (define_insn "xorsi3"
@@ -286,12 +297,13 @@
   "@
   eor.s\t%0,%2
   bitflip.s\t%0,#%p2
-  eor.m\t%0,%1,%2
-  bitflip.m\t%0,%1,#%p2
-  eor.m\t%0,%1,#%2
+  eor%?.m\t%0,%1,%2
+  bitflip%?.m\t%0,%1,#%p2
+  eor%?.m\t%0,%1,#%2
   eor.m\t%0,#%2
   eor.l\t%0,#%2"
-  [(set_attr "length" "2,2,4,4,4,4,6")]
+  [(set_attr "length" "2,2,4,4,4,4,6")
+   (set_attr "predicable" "no,no,yes,yes,yes,no,no")]
 )
 
 (define_insn "andsi3"
@@ -306,15 +318,16 @@
   and.s\t%0,%2
   bitclear.s\t%0,#%P2
   bmask.s\t%0,#%k2
-  and.m\t%0,%1,%2
-  and.m\t%0,%1,#%2
-  bic.m\t%0,%1,#%v2
-  bitclear.m\t%0,%1,#%P2
-  bmask.m\t%0,%1,#%k2
+  and%?.m\t%0,%1,%2
+  and%?.m\t%0,%1,#%2
+  bic%?.m\t%0,%1,#%v2
+  bitclear%?.m\t%0,%1,#%P2
+  bmask%?.m\t%0,%1,#%k2
   and.m\t%0,#%2
   bic.m\t%0,#%v2
   and.l\t%0,#%2"
-  [(set_attr "length" "2,2,2,4,4,4,4,4,4,4,6")]
+  [(set_attr "length" "2,2,2,4,4,4,4,4,4,4,6")
+   (set_attr "predicable" "no,no,no,yes,yes,yes,yes,yes,no,no,no")]
 )
 
 (define_insn "iorsi3"
@@ -327,12 +340,13 @@
   "@
   or.s\t%0,%2
   bitset.s\t%0,#%p2
-  or.m\t%0,%1,%2
-  or.m\t%0,%1,#%2
-  bitset.m\t%0,%1,#%p2
+  or%?.m\t%0,%1,%2
+  or%?.m\t%0,%1,#%2
+  bitset%?.m\t%0,%1,#%p2
   or.m\t%0,#%2
   or.l\t%0,#%2"
-  [(set_attr "length" "2,2,4,4,4,4,6")]
+  [(set_attr "length" "2,2,4,4,4,4,6")
+   (set_attr "predicable" "no,no,yes,yes,yes,no,no")]
 )
 
 (define_insn "one_cmplsi2"
@@ -341,8 +355,9 @@
   ""
   "@
   not.s\t%0,%1
-  not.m\t%0,%1"
-  [(set_attr "length" "2,4")]
+  not%?.m\t%0,%1"
+  [(set_attr "length" "2,4")
+   (set_attr "predicable" "no,yes")]
 )
 
 (define_insn "subsi3"
@@ -355,10 +370,11 @@
   sub.s\t%0,%2
   neg.s\t%0,%2
   rsub.s\t%0,%1
-  rsub.m\t%0,%2,#%1
+  rsub%?.m\t%0,%2,#%1
   rsub.l\t%0,#%1
-  sub.m\t%0,%1,%2"
-  [(set_attr "length" "2,2,2,4,6,4")]
+  sub%?.m\t%0,%1,%2"
+  [(set_attr "length" "2,2,2,4,6,4")
+   (set_attr "predicable" "no,no,no,yes,no,yes")]
 )
 
 (define_insn "divsi3"
@@ -367,9 +383,10 @@
         	(match_operand:SI 2 "nonmemory_operand" "r,Is6")))]
   ""
   "@
-  div.ss\t%0,%1,%2
-  div.ss\t%0,%1,#%2"
-  [(set_attr "length" "4,4")]
+  div%?.ss\t%0,%1,%2
+  div%?.ss\t%0,%1,#%2"
+  [(set_attr "length" "4,4")
+   (set_attr "predicable" "yes")]
 )
 
 (define_insn "udivsi3"
@@ -378,9 +395,10 @@
         	 (match_operand:SI 2 "nonmemory_operand" "r,Is6")))]
   ""
   "@
-  div.uu\t%0,%1,%2
-  div.uu\t%0,%1,#%2"
-  [(set_attr "length" "4,4")]
+  div%?.uu\t%0,%1,%2
+  div%?.uu\t%0,%1,#%2"
+  [(set_attr "length" "4,4")
+   (set_attr "predicable" "yes")]
 )
 
 (define_insn "vc4_add_asl"
@@ -392,8 +410,9 @@
   ""
   "@
   addscale.s\t%0,%2<<3
-  addscale.m\t%0,%1,%2<<%3"
-  [(set_attr "length" "2,4")]
+  addscale%?.m\t%0,%1,%2<<%3"
+  [(set_attr "length" "2,4")
+   (set_attr "predicable" "no,yes")]
 )
 
 (define_insn "vc4_sub_asl"
@@ -403,8 +422,9 @@
 	  (ashift:SI (match_operand:SI 2 "register_operand"	 "r")
 		     (match_operand:SI 3 "arith_shift_operand" "Ish"))))]
   ""
-  "subscale.m\t%0,%1,%2<<%3"
-  [(set_attr "length" "4")]
+  "subscale%?.m\t%0,%1,%2<<%3"
+  [(set_attr "length" "4")
+   (set_attr "predicable" "yes")]
 )
 
 ;; --- Float arithmetic -----------------------------------------------------
@@ -465,16 +485,18 @@
 	  (match_operand:SF 1 "register_operand" "r")
 	  (match_operand:SF 2 "register_operand" "r")))]
   ""
-  "<fpu_list_3op:fpu_opcode>\t%0,%1,%2"
-  [(set_attr "length" "4")]
+  "<fpu_list_3op:fpu_opcode>%?\t%0,%1,%2"
+  [(set_attr "length" "4")
+   (set_attr "predicable" "yes")]
 )
 
 (define_insn "<fpu_list_2op:fpu_insn>"
   [(set (match_operand:SF 0 "register_operand" "=r")
 	(fpu_list_2op:SF (match_operand:SF 1 "register_operand" "r")))]
   ""
-  "<fpu_list_2op:fpu_opcode>\t%0,%1"
-  [(set_attr "length" "4")]
+  "<fpu_list_2op:fpu_opcode>%?\t%0,%1"
+  [(set_attr "length" "4")
+   (set_attr "predicable" "yes")]
 )
 
 ;; Extra float operations, such as conversions.
@@ -483,24 +505,27 @@
   [(set (match_operand:SI 0 "register_operand" "=r")
         (fix:SI (match_operand:SF 1 "register_operand" "r")))]
   ""
-  "ftrunc\t%0,%1,sasl #0"
-  [(set_attr "length" "4")]
+  "ftrunc%?\t%0,%1,sasl #0"
+  [(set_attr "length" "4")
+   (set_attr "predicable" "yes")]
 )
 
 (define_insn "floatsisf2"
   [(set (match_operand:SF 0 "register_operand" "=r")
 	(float:SF (match_operand:SI 1 "register_operand" "r")))]
   ""
-  "flts\t%0,%1,sasr #0"
-  [(set_attr "length" "4")]
+  "flts%?\t%0,%1,sasr #0"
+  [(set_attr "length" "4")
+   (set_attr "predicable" "yes")]
 )
 
 (define_insn "floatunssisf2"
   [(set (match_operand:SF 0 "register_operand" "=r")
 	(unsigned_float:SF (match_operand:SI 1 "register_operand" "r")))]
   ""
-  "fltu\t%0,%1,sasr #0"
-  [(set_attr "length" "4")]
+  "fltu%?\t%0,%1,sasr #0"
+  [(set_attr "length" "4")
+   (set_attr "predicable" "yes")]
 )
 
 ;; --- Sign extension -------------------------------------------------------
@@ -511,8 +536,9 @@
   ""
   "@
   bmask.s\t%0,#8
-  bmask.m\t%0,%1,#8"
-  [(set_attr "length" "2,4")]
+  bmask%?.m\t%0,%1,#8"
+  [(set_attr "length" "2,4")
+   (set_attr "predicable" "no,yes")]
 )
 
 (define_insn "zero_extendhisi2"
@@ -521,8 +547,9 @@
   ""
   "@
   bmask.s\t%0,#16
-  bmask.m\t%0,%1,#16"
-  [(set_attr "length" "2,4")]
+  bmask%?.m\t%0,%1,#16"
+  [(set_attr "length" "2,4")
+   (set_attr "predicable" "no,yes")]
 )
 
 (define_insn "extendqisi2"
@@ -532,8 +559,9 @@
   ""
   "@
   signext.s\t%0,#7
-  signext.m\t%0,%1,#7"
-  [(set_attr "length" "2,4")]
+  signext%?.m\t%0,%1,#7"
+  [(set_attr "length" "2,4")
+   (set_attr "predicable" "no,yes")]
 )
 
 (define_insn "extendhisi2"
@@ -543,8 +571,9 @@
   ""
   "@
   signext.s\t%0,#15
-  signext.m\t%0,%1,#15"
-  [(set_attr "length" "2,4")]
+  signext%?.m\t%0,%1,#15"
+  [(set_attr "length" "2,4")
+   (set_attr "predicable" "no,yes")]
 )
 
 ;; --- Jumps ----------------------------------------------------------------
@@ -703,11 +732,12 @@
   "@
   cmp.s\t%0,%1
   cmp.s\t%0,#%1
-  cmp.m\t%0,%1
-  cmp.m\t%0,#%1
+  cmp%?.m\t%0,%1
+  cmp%?.m\t%0,#%1
   cmp.m\t%0,#%1
   cmp.l\t%0,#%1"
-  [(set_attr "length" "2,2,4,4,4,6")]
+  [(set_attr "length" "2,2,4,4,4,6")
+   (set_attr "predicable" "no,no,yes,yes,no,no")]
 )
 
 (define_insn "*vc4_test_sf"
@@ -715,8 +745,9 @@
         (compare:CCFP (match_operand:SF 0 "register_operand" "r")
                       (match_operand:SF 1 "register_operand" "r")))]
   ""
-  "fcmp\t%0,%1"
-  [(set_attr "length" "4")]
+  "fcmp%?\t%0,%1"
+  [(set_attr "length" "4")
+   (set_attr "predicable" "yes")]
 )
 
 (define_insn "*vc4_branch"
@@ -730,3 +761,10 @@
   [(set_attr "length" "4")]
 )
 
+; General conditional execution.
+(define_cond_exec
+  [(match_operator 0 "ordered_comparison_operator"
+    [(match_operand 1 "cc_register" "") (const_int 0)])]
+  ""
+  ""
+)

@@ -242,10 +242,94 @@ vc4_print_operand_address (FILE *stream, machine_mode /*mode*/, rtx x)
     }
 }
 
-/*
- * Print operand x (an rtx) in assembler syntax to file stream according
- * to modifier code.
- */
+static void
+vc4_print_cc_condition (FILE *stream, rtx_code code)
+{
+  switch (code)
+    {
+    case NE:
+      fputs ("ne", stream);
+      break;
+    case EQ:
+      fputs ("eq", stream);
+      break;
+    case GT:
+      fputs ("gt", stream);
+      break;
+    case GE:
+      fputs ("ge", stream);
+      break;
+    case LT:
+      fputs ("lt", stream);
+      break;
+    case LE:
+      fputs ("le", stream);
+      break;
+    case GTU:
+      fputs ("hi", stream);
+      break;
+    case GEU:
+      fputs ("hs", stream);
+      break;
+    case LTU:
+      fputs ("lo", stream);
+      break;
+    case LEU:
+      fputs ("ls", stream);
+      break;
+    default:
+      gcc_unreachable ();
+    }
+}
+
+static void
+vc4_print_ccfp_condition (FILE *stream, rtx_code code)
+{
+  switch (code)
+    {
+    case NE:
+      fputs ("ne", stream);
+      break;
+    case EQ:
+      fputs ("eq", stream);
+      break;
+    case GT:
+      fputs ("gt", stream);
+      break;
+    case GE:
+      fputs ("ge", stream);
+      break;
+    case LT:
+      fputs ("lt", stream);
+      break;
+    case LE:
+      fputs ("le", stream);
+      break;
+    default:
+      gcc_unreachable ();
+    }
+}
+
+static void
+vc4_print_condition (FILE *stream, machine_mode mode, rtx_code code)
+{
+  switch (mode)
+    {
+    case CCmode:
+      vc4_print_cc_condition (stream, code);
+      break;
+
+    case CCFPmode:
+      vc4_print_ccfp_condition (stream, code);
+      break;
+
+    default:
+      gcc_unreachable ();
+    }
+}
+
+/* Print operand x (an rtx) in assembler syntax to file stream according
+   to modifier code.  */
 
 static void
 vc4_print_operand (FILE *stream, rtx x, int code)
@@ -257,78 +341,7 @@ vc4_print_operand (FILE *stream, rtx x, int code)
         break;
 
       case 'c':
-        {
-          machine_mode mode = GET_MODE (XEXP (x, 0));
-          switch (mode)
-            {
-            case CCmode:
-              switch (GET_CODE (x))
-                {
-                case NE:
-                  fputs ("ne", stream);
-                  break;
-                case EQ:
-                  fputs ("eq", stream);
-                  break;
-                case GT:
-                  fputs ("gt", stream);
-                  break;
-                case GE:
-                  fputs ("ge", stream);
-                  break;
-                case LT:
-                  fputs ("lt", stream);
-                  break;
-                case LE:
-                  fputs ("le", stream);
-                  break;
-                case GTU:
-                  fputs ("hi", stream);
-                  break;
-                case GEU:
-                  fputs ("hs", stream);
-                  break;
-                case LTU:
-                  fputs ("lo", stream);
-                  break;
-                case LEU:
-                  fputs ("ls", stream);
-                  break;
-                default:
-                  gcc_unreachable ();
-                }
-              break;
-
-            case CCFPmode:
-              switch (GET_CODE (x))
-                {
-                case NE:
-                  fputs ("ne", stream);
-                  break;
-                case EQ:
-                  fputs ("eq", stream);
-                  break;
-                case GT:
-                  fputs ("gt", stream);
-                  break;
-                case GE:
-                  fputs ("ge", stream);
-                  break;
-                case LT:
-                  fputs ("lt", stream);
-                  break;
-                case LE:
-                  fputs ("le", stream);
-                  break;
-                default:
-                  gcc_unreachable ();
-                }
-              break;
-
-            default:
-              gcc_unreachable ();
-            }
-        }
+        vc4_print_condition (stream, GET_MODE (XEXP (x, 0)), GET_CODE (x));
         break;
 
       case 'v':
@@ -352,6 +365,16 @@ vc4_print_operand (FILE *stream, rtx x, int code)
 
 	  asm_fprintf (stream, "%d", exact_log2 (ival & 0xffffffff));
         }
+	break;
+
+      case '?':
+	if (current_insn_predicate)
+	  {
+	    fputc ('.', stream);
+	    vc4_print_condition (stream,
+				 GET_MODE (XEXP (current_insn_predicate, 0)),
+				 GET_CODE (current_insn_predicate));
+	  }
 	break;
 
       default:

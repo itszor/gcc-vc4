@@ -232,6 +232,8 @@ enum {
   ((REGNO) < AP_REG || (REGNO) == ARG_POINTER_REGNUM	\
    || (REGNO) == FRAME_POINTER_REGNUM)
 
+#define PRINT_OPERAND_PUNCT_VALID_P(CODE) ((CODE) == '?')
+
 /* Value is 1 if it is a good idea to tie two pseudo registers
    when one has mode MODE1 and one has mode MODE2.
    If HARD_REGNO_MODE_OK could produce different values for MODE1 and MODE2,
@@ -582,6 +584,11 @@ extern const enum reg_class vc4_regno_reg_class[FIRST_PSEUDO_REGISTER];
    Desirable on machines where ordinary constants are expensive
    but a CALL with constant address is cheap.  */
 #define NO_FUNCTION_CSE 1
+
+/* We don't know how expensive branches are.  */
+#define BRANCH_COST(SPEED, PREDICTABLE) 2
+
+#define MAX_CONDITIONAL_EXECUTE 3
 
 /* The machine modes of pointers and functions.  */
 #define Pmode          SImode
