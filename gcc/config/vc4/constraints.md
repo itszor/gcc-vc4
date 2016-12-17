@@ -30,6 +30,16 @@
   (and (match_code "const_int")
        (match_test "ival == 0")))
 
+(define_constraint "I03"
+  "Integer three."
+  (and (match_code "const_int")
+       (match_test "ival == 3")))
+
+(define_constraint "Ish"
+  "Shift amount for arithmetic+shift insn."
+  (and (match_code "const_int")
+       (match_test "ival >= 1 && ival <= 256 && exact_log2 (ival) != -1")))
+
 (define_constraint "Ip2"
   "A power of two."
   (and (match_code "const_int")

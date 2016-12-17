@@ -38,3 +38,7 @@
 (define_special_predicate "cc_register"
   (and (match_code "reg")
        (match_test "REGNO (op) == CC_REGNUM")))
+
+(define_predicate "arith_shift_operand"
+  (and (match_code "const_int")
+       (match_test "INTVAL (op) >= 1 && INTVAL (op) <= 8")))

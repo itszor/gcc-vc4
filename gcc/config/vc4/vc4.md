@@ -192,7 +192,7 @@
   [(set (match_operand:SI 0 "register_operand"
 					   "=f,  f,  f,r,  r,  r,  r,  r,r")
 	(plus:SI (match_operand:SI 1 "register_operand"
-					    "0,  0,  0,r,  r,  r,  r,  0,r")
+					   "%0,  0,  0,r,  r,  r,  r,  0,r")
 		 (match_operand:SI 2 "nonmemory_operand"
 					    "f,IU5,Ju5,r,IS6,JS6,IsX,JsX,i")))]
   ""
@@ -261,10 +261,10 @@
 )
 
 (define_insn "mulsi3"
-  [(set (match_operand:SI 0 "register_operand"         "=f,  f,r,  r,  r,r")
-        (mult:SI (match_operand:SI 1 "register_operand" "0,  0,r,  r,  0,0")
+  [(set (match_operand:SI 0 "register_operand"          "=f,  f,r,  r,  r,r")
+        (mult:SI (match_operand:SI 1 "register_operand" "%0,  0,r,  r,  0,0")
                  (match_operand:SI 2 "nonmemory_operand"
-							"f,Iu5,r,Is6,IsX,i")))]
+							 "f,Iu5,r,Is6,IsX,i")))]
   ""
   "@
   mul.s\t%0,%2
@@ -279,7 +279,7 @@
 (define_insn "xorsi3"
   [(set (match_operand:SI 0 "register_operand"      "=f,  f,r,  r,  r,  r,r")
         (xor:SI (match_operand:SI 1 "register_operand"
-						     "0,  0,r,  r,  r,  0,0")
+						    "%0,  0,r,  r,  r,  0,0")
                 (match_operand:SI 2 "nonmemory_operand"
 						     "f,Ip2,r,Ip2,Is6,IsX,i")))]
   ""
@@ -298,7 +298,7 @@
   [(set (match_operand:SI 0 "register_operand"
 				   "=f,  f,  f,r,  r,  r,  r,  r,  r,  r,r")
         (and:SI (match_operand:SI 1 "register_operand"
-				    "0,  0,  0,r,  r,  r,  r,  r,  0,  0,0")
+				   "%0,  0,  0,r,  r,  r,  r,  r,  0,  0,0")
                 (match_operand:SI 2 "nonmemory_operand"
 				    "f,Kp2,Ims,r,Is6,Ks6,Kp2,Ims,IsX,KsX,i")))]
   ""
@@ -320,7 +320,7 @@
 (define_insn "iorsi3"
   [(set (match_operand:SI 0 "register_operand"      "=f,  f,r,  r,  r,  r,r")
         (ior:SI (match_operand:SI 1 "register_operand"
-						     "0,  0,r,  r,  r,  0,0")
+						    "%0,  0,r,  r,  r,  0,0")
                 (match_operand:SI 2 "nonmemory_operand"
 						     "f,Ip2,r,Is6,Ip2,IsX,i")))]
   ""
@@ -381,6 +381,30 @@
   div.uu\t%0,%1,%2
   div.uu\t%0,%1,#%2"
   [(set_attr "length" "4,4")]
+)
+
+(define_insn "vc4_add_asl"
+  [(set (match_operand:SI 0 "register_operand"			      "=f,r")
+	(plus:SI (ashift:SI (match_operand:SI 2 "register_operand"     "f,r")
+			    (match_operand:SI 3 "arith_shift_operand"
+								     "I03,Ish"))
+		 (match_operand:SI 1 "register_operand"		       "0,r")))]
+  ""
+  "@
+  addscale.s\t%0,%2<<3
+  addscale.m\t%0,%1,%2<<%3"
+  [(set_attr "length" "2,4")]
+)
+
+(define_insn "vc4_sub_asl"
+  [(set (match_operand:SI 0 "register_operand"			"=r")
+	(minus:SI
+	  (match_operand:SI 1 "register_operand"		 "r")
+	  (ashift:SI (match_operand:SI 2 "register_operand"	 "r")
+		     (match_operand:SI 3 "arith_shift_operand" "Ish"))))]
+  ""
+  "subscale.m\t%0,%1,%2<<%3"
+  [(set_attr "length" "4")]
 )
 
 ;; --- Float arithmetic -----------------------------------------------------
