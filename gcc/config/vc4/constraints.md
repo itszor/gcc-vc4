@@ -38,7 +38,7 @@
 (define_constraint "Ish"
   "Shift amount for arithmetic+shift insn."
   (and (match_code "const_int")
-       (match_test "ival >= 1 && ival <= 256 && exact_log2 (ival) != -1")))
+       (match_test "ival >= 1 && ival <= 8")))
 
 (define_constraint "Ip2"
   "A power of two."
