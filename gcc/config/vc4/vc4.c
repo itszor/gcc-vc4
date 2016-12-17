@@ -230,7 +230,7 @@ vc4_print_operand_address (FILE *stream, machine_mode /*mode*/, rtx x)
 	       && REG_P (XEXP (XEXP (x, 0), 0))
 	       && CONST_INT_P (XEXP (XEXP (x, 0), 1))
 	       && REG_P (XEXP (x, 1)))
-	asm_fprintf (stream, "(%r+%r<<%wd)", REGNO (XEXP (x, 1)),
+	asm_fprintf (stream, "(%r+%r<<%d)", REGNO (XEXP (x, 1)),
 		     REGNO (XEXP (XEXP (x, 0), 0)),
 		     exact_log2 (INTVAL (XEXP (XEXP (x, 0), 1))));
       else
