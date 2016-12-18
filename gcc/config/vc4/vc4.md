@@ -481,6 +481,9 @@
 
 ;; Expand all FPU instructions.
 
+; NOTE: Floating-point ops don't appear to support predication, although the
+; assembler encoding suggests that they would.
+
 (define_insn "<fpu_list_3op:fpu_insn>"
   [(set (match_operand:SF 0 "s_register_operand" "=r")
 	(fpu_list_3op:SF
@@ -489,7 +492,7 @@
   ""
   "<fpu_list_3op:fpu_opcode>%?\t%0,%1,%2"
   [(set_attr "length" "4")
-   (set_attr "predicable" "yes")]
+   (set_attr "predicable" "no")]
 )
 
 (define_insn "<fpu_list_2op:fpu_insn>"
@@ -498,7 +501,7 @@
   ""
   "<fpu_list_2op:fpu_opcode>%?\t%0,%1"
   [(set_attr "length" "4")
-   (set_attr "predicable" "yes")]
+   (set_attr "predicable" "no")]
 )
 
 ;; Extra float operations, such as conversions.
@@ -509,7 +512,7 @@
   ""
   "ftrunc%?\t%0,%1,sasl #0"
   [(set_attr "length" "4")
-   (set_attr "predicable" "yes")]
+   (set_attr "predicable" "no")]
 )
 
 (define_insn "floatsisf2"
@@ -518,7 +521,7 @@
   ""
   "flts%?\t%0,%1,sasr #0"
   [(set_attr "length" "4")
-   (set_attr "predicable" "yes")]
+   (set_attr "predicable" "no")]
 )
 
 (define_insn "floatunssisf2"
@@ -527,7 +530,7 @@
   ""
   "fltu%?\t%0,%1,sasr #0"
   [(set_attr "length" "4")
-   (set_attr "predicable" "yes")]
+   (set_attr "predicable" "no")]
 )
 
 ;; --- Sign extension -------------------------------------------------------
