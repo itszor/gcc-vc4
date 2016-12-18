@@ -1453,8 +1453,7 @@ vc4_scaled_index_addr_p (machine_mode mode, rtx x, bool strict_p)
 }
 
 static bool
-vc4_legitimate_address_p_1 (machine_mode mode ATTRIBUTE_UNUSED, rtx x,
-			    bool strict)
+vc4_legitimate_address_p_1 (machine_mode mode, rtx x, bool strict)
 {
   if (CONSTANT_ADDRESS_P (x))
     return true;

@@ -50,7 +50,7 @@
       && GET_MODE_SIZE (MODE) < UNITS_PER_WORD) \
     {						\
       (MODE) = SImode;				\
-      (UNSIGNEDP) = 1;				\
+      /*(UNSIGNEDP) = 1;*/			\
     }
 
 /* Endianness configuration. */
@@ -478,18 +478,22 @@ extern const enum reg_class vc4_regno_reg_class[FIRST_PSEUDO_REGISTER];
 #define REGNO_OK_FOR_BASE_P(REGNO) \
   vc4_regno_ok_for_base_p ((REGNO), true)
 
+#define REGNO_OK_FOR_INDEX_P(REGNO) \
+  vc4_regno_ok_for_base_p ((REGNO), true)
+
 #else
 
 #define REGNO_OK_FOR_BASE_P(REGNO) \
   vc4_regno_ok_for_base_p ((REGNO), false)
 
-#endif
+#define REGNO_OK_FOR_INDEX_P(REGNO) \
+  vc4_regno_ok_for_base_p ((REGNO), false)
 
-#define REGNO_OK_FOR_INDEX_P(REGNO) 0
+#endif
 
 /* Maximum number of registers that can appear in a valid memory 
    address.  */
-#define MAX_REGS_PER_ADDRESS 1
+#define MAX_REGS_PER_ADDRESS 2
 
 /* Specify the machine mode that this machine uses
    for the index in the tablejump instruction.  */
@@ -568,8 +572,8 @@ extern const enum reg_class vc4_regno_reg_class[FIRST_PSEUDO_REGISTER];
    done, UNKNOWN if none.  */
 #define LOAD_EXTEND_OP(MODE) ZERO_EXTEND
 
-/* Nonzero if access to memory by bytes is slow and undesirable.  */
-#define SLOW_BYTE_ACCESS 0
+/* Byte accesses are not faster than word accesses.  */
+#define SLOW_BYTE_ACCESS 1
 
 /* Shift counts are truncated to 6-bits (0 to 63) instead of the expected
    5-bits, so we can not define SHIFT_COUNT_TRUNCATED to true for this

@@ -42,3 +42,26 @@
 (define_predicate "arith_shift_operand"
   (and (match_code "const_int")
        (match_test "INTVAL (op) >= 1 && INTVAL (op) <= 8")))
+
+; By default, register_operand permits (subreg:N (mem:M)) operands, which is
+; never desirable for us (and appears to trigger an LRA bug).  Instead, only
+; permit subregs of regs in operands (like ARM does).  This is probably a hack.
+
+(define_predicate "s_register_operand"
+  (match_code "reg,subreg")
+{
+  if (GET_CODE (op) == SUBREG)
+    op = SUBREG_REG (op);
+
+  return (REG_P (op)
+	  && (REGNO (op) >= FIRST_PSEUDO_REGISTER
+	      || REGNO_REG_CLASS (REGNO (op)) != NO_REGS));
+})
+
+(define_predicate "alu_rhs_operand"
+  (ior (match_operand 0 "immediate_operand")
+       (match_operand 0 "s_register_operand")))
+
+(define_predicate "extend_operand"
+  (ior (match_operand 0 "s_register_operand")
+       (match_operand 0 "memory_operand")))
