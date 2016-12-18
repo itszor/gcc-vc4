@@ -68,6 +68,9 @@
 
 ;; --- Generic moves --------------------------------------------------------
 
+; NOTE: Conditional loads/stores throw undefined instruction exceptions on the
+; hardware, so don't use those.
+
 (define_insn "*mov<mode>_insn"
   [(set (match_operand:QHSI 0 "nonimmediate_operand"
 	       "=f,  f,f,  r,  r,  r,  r,  r,  r,r,r, f, r, r,r, Us,Uc,Ud,Ul")
@@ -87,16 +90,16 @@
   mov.l\t%0,#%1
   mov%?.m\t%0,%1
   ld<suffix>.s\t%0,%1
-  ld<suffix>%?.m\t%0,%1
+  ld<suffix>.m\t%0,%1
   ld<suffix>.m\t%0,%1
   ld<suffix>.l\t%0,%1
   st<suffix>.s\t%1,%0
-  st<suffix>%?.m\t%1,%0
+  st<suffix>.m\t%1,%0
   st<suffix>.m\t%1,%0
   st<suffix>.l\t%1,%0"
   [(set_attr "length" "2,2,2,4,4,4,4,4,4,6,4,2,4,4,6,2,4,4,6")
    (set_attr "predicable"
-     "no,no,no,yes,yes,yes,no,no,no,no,yes,no,yes,no,no,no,yes,no,no")]
+     "no,no,no,yes,yes,yes,no,no,no,no,yes,no,no,no,no,no,no,no,no")]
 )
 
 ;; pushes/pops.
