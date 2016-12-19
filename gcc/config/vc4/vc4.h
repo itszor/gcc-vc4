@@ -514,6 +514,9 @@ extern const enum reg_class vc4_regno_reg_class[FIRST_PSEUDO_REGISTER];
 #undef WCHAR_TYPE_SIZE
 #define WCHAR_TYPE_SIZE BITS_PER_WORD
 
+#define CLZ_DEFINED_VALUE_AT_ZERO(MODE, VALUE) \
+  (((VALUE) = -1), 2)
+
 /* This is suitable for bare metal, but might be better done as a SWI or
    something if running under some future hypothetical RTOS.  */
 
@@ -598,6 +601,24 @@ extern const enum reg_class vc4_regno_reg_class[FIRST_PSEUDO_REGISTER];
 #define Pmode          SImode
 #define FUNCTION_MODE  HImode
 
+#define JUMP_TABLES_IN_TEXT_SECTION 1
+
+#define CASE_VECTOR_MODE SImode
+
+#define CASE_VECTOR_PC_RELATIVE 1
+
+#undef ASM_OUTPUT_CASE_LABEL
+#define ASM_OUTPUT_CASE_LABEL(STREAM, PREFIX, NUM, TABLE)    \
+  do {							     \
+    (*targetm.asm_out.internal_label) (STREAM, PREFIX, NUM); \
+  } while (0)
+
+#define ASM_OUTPUT_CASE_END(STREAM, NUM, TABLE)		\
+  do {							\
+    if (GET_MODE (PATTERN (TABLE)) == QImode)		\
+      ASM_OUTPUT_ALIGN (STREAM, 1);			\
+  } while (0)
+
 /* Assembler output control.  */
 #define ASM_COMMENT_START "\t;"
 
@@ -673,19 +694,13 @@ extern const enum reg_class vc4_regno_reg_class[FIRST_PSEUDO_REGISTER];
 #define ASM_GENERATE_INTERNAL_LABEL(STRING, PREFIX, NUM)  \
   sprintf (STRING, "*.%s%ld", PREFIX, (long) NUM)
 
-/* Jump tables must be 32 bit aligned.  */
-#undef  ASM_OUTPUT_CASE_LABEL
-#define ASM_OUTPUT_CASE_LABEL(STREAM,PREFIX,NUM,TABLE) \
-  fprintf (STREAM, "\t.p2align 2\n.%s%d:\n", PREFIX, NUM);
-
-/* Output a relative address. Not needed since jump tables are absolute
-   but we must define it anyway.  */
-#define ASM_OUTPUT_ADDR_DIFF_ELT(STREAM,BODY,VALUE,REL)  \
-  fputs ("- - - ASM_OUTPUT_ADDR_DIFF_ELT called!\n", STREAM)
+/* Output a relative address.  */
+#define ASM_OUTPUT_ADDR_DIFF_ELT(STREAM, BODY, VALUE, REL)  \
+  do { fprintf (STREAM, "\t.word .L%d-.L%d\n", VALUE, REL); } while (0)
 
 /* Output an element of a dispatch table.  */
-#define ASM_OUTPUT_ADDR_VEC_ELT(STREAM,VALUE)  \
-    fprintf (STREAM, "\t.long\t.L%d\n", VALUE)
+/*#define ASM_OUTPUT_ADDR_VEC_ELT(STREAM,VALUE)  \
+    fprintf (STREAM, "\t.long\t.L%d\n", VALUE)*/
 
 /* Output various types of constants.  */
 

@@ -429,6 +429,88 @@
    (set_attr "predicable" "yes")]
 )
 
+(define_insn "sminsi3"
+  [(set (match_operand:SI 0 "s_register_operand"          "=f,r,  r,  r,r")
+	(smin:SI (match_operand:SI 1 "s_register_operand" "%0,r,  r,  0,r")
+		 (match_operand:SI 2 "alu_rhs_operand"     "f,r,Is6,IsX,i")))]
+  ""
+  "@
+  min.s\t%0,%2
+  min%?.m\t%0,%1,%2
+  min%?.m\t%0,%1,#%2
+  min.m\t%0,#%2
+  min.l\t%0,#%2"
+  [(set_attr "length" "2,4,4,4,6")
+   (set_attr "predicable" "no,yes,yes,no,no")]
+)
+
+(define_insn "smaxsi3"
+  [(set (match_operand:SI 0 "s_register_operand"          "=f,r,  r,  r,r")
+	(smax:SI (match_operand:SI 1 "s_register_operand" "%0,r,  r,  0,r")
+		(match_operand:SI 2 "alu_rhs_operand"      "f,r,Is6,IsX,i")))]
+  ""
+  "@
+  max.s\t%0,%2
+  max%?.m\t%0,%1,%2
+  max%?.m\t%0,%1,#%2
+  max.m\t%0,#%2
+  max.l\t%0,#%2"
+  [(set_attr "length" "2,4,4,4,6")
+   (set_attr "predicable" "no,yes,yes,no,no")]
+)
+
+(define_insn "popcountsi2"
+  [(set (match_operand:SI 0 "s_register_operand"              "=r,  r")
+	(popcount:SI (match_operand:SI 1 "s_register_operand"  "r,Is6")))]
+  ""
+  "@
+  count%?\t%0,%1
+  count%?\t%0,#%1"
+  [(set_attr "length" "4")
+   (set_attr "predicable" "yes")]
+)
+
+(define_insn "clzsi2"
+  [(set (match_operand:SI 0 "s_register_operand"         "=f,r,  r,  r,r")
+	(clz:SI (match_operand:SI 1 "s_register_operand"  "f,r,Is6,IsX,i")))]
+  ""
+  "@
+  msb.s\t%0,%1
+  msb%?.m\t%0,%1
+  msb%?.m\t%0,#%1
+  msb.m\t%0,#%1
+  msb.l\t%0,#%1"
+  [(set_attr "length" "2,4,4,4,6")
+   (set_attr "predicable" "no,yes,yes,no,no")]
+)
+
+; I don't think it's actually possible to generate these saturating patterns
+; (from C) at present.  We could add builtins.
+
+(define_insn "ssaddsi3"
+  [(set (match_operand:SI 0 "s_register_operand"	     "=r,  r")
+	(ss_plus:SI (match_operand:SI 1 "s_register_operand" "%r,  r")
+		    (match_operand:SI 2 "alu_rhs_operand"     "r,Is6")))]
+  ""
+  "@
+  adds%?.m\t%0,%1,%2
+  adds%?.m\t%0,%1,#%2"
+  [(set_attr "length" "4")
+   (set_attr "predicable" "yes")]
+)
+
+(define_insn "sssubsi3"
+  [(set (match_operand:SI 0 "s_register_operand"	      "=r,  r")
+	(ss_minus:SI (match_operand:SI 1 "s_register_operand"  "r,  r")
+		     (match_operand:SI 2 "alu_rhs_operand"     "r,Is6")))]
+  ""
+  "@
+  subs%?.m\t%0,%1,%2
+  subs%?.m\t%0,%1,#%2"
+  [(set_attr "length" "4")
+   (set_attr "predicable" "yes")]
+)
+
 ;; --- Float arithmetic -----------------------------------------------------
 
 ;; These are mostly simple 2op and 3op instructions and can be generated
@@ -696,6 +778,60 @@
   vc4_set_return_address (operands[0], operands[1]);
   DONE;
 })
+
+(define_expand "casesi"
+  [(match_operand:SI 0 "s_register_operand" "") ; index
+   (match_operand:SI 1 "const_int_operand" "")	; lower bound
+   (match_operand:SI 2 "const_int_operand" "")	; total range
+   (match_operand:SI 3 "" "")			; label preceding table
+   (match_operand:SI 4 "" "")]			; out of range label
+  ""
+{
+  if (operands[1] != const0_rtx)
+    {
+      rtx reg = gen_reg_rtx (SImode);
+      emit_insn (gen_addsi3 (reg, operands[0],
+			     gen_int_mode (-INTVAL (operands[1]), SImode)));
+      operands[0] = reg;
+    }
+
+  emit_jump_insn (gen_vc4_casesi_synthetic (operands[0], operands[2],
+					    operands[3], operands[4],
+					    force_reg (SImode,
+					      gen_rtx_LABEL_REF (Pmode,
+								 operands[3])),
+					    gen_reg_rtx (SImode)));
+  DONE;
+})
+
+; This pattern implements a "generic"/unbounded synthetic switch statement,
+; then CASE_VECTOR_SHORTEN_MODE can transform it to shorter variants supported
+; by the hardware if possible.
+
+(define_insn "vc4_casesi_synthetic"
+  [(parallel [(set (pc)
+	        (if_then_else
+		  (leu (match_operand:SI 0 "s_register_operand" "r")
+		       (match_operand:SI 1 "alu_rhs_operand" "i"))
+		  (plus:SI (match_operand:SI 4 "s_register_operand" "r")
+			   (mem:SI
+			     (plus:SI (mult:SI (match_dup 0) (const_int 4))
+			     (match_dup 4))))
+		  (label_ref (match_operand 3 "" ""))))
+	      (clobber (match_operand:SI 5 "s_register_operand" "=&r"))
+	      (clobber (reg:CC CC_REGNO))
+	      (use (label_ref (match_operand 2 "" "")))])]
+  ""
+{
+  return "cmp\t%0,#%1"		"\;"
+	 "bgt\t%3"		"\;"
+	 "ld\t%5,(%4+%0<<2)"	"\;"
+	 "add\t%5,%5,%4"	"\;"
+	 "b\t%5";
+}
+  [(set_attr "length" "20")
+   (set_attr "predicable" "no")]
+)
 
 ;; --- Conditionals ---------------------------------------------------------
 
