@@ -534,8 +534,8 @@ extern const enum reg_class vc4_regno_reg_class[FIRST_PSEUDO_REGISTER];
   volatile int *const L1_D_FLUSH_S = (int*) 0x7ee02104;                    \
   volatile int *const L1_D_FLUSH_E = (int*) 0x7ee02108;                    \
   __asm__ __volatile__ ("mov %0,sr\n\tdi" : "=r" (ints_enabled));          \
-  *L1_D_FLUSH_S = _begin;                                                  \
-  *L1_D_FLUSH_E = _end;                                                    \
+  *L1_D_FLUSH_S = (int) _begin;                                            \
+  *L1_D_FLUSH_E = (int) _end;                                              \
   /* Flush dcache.  */                                                     \
   unsigned tmp = *L1_D_CONTROL;                                            \
   tmp |= 2; /* L1_D_CONTROL_DC0_FLUSH_SET.  */                             \
@@ -543,10 +543,10 @@ extern const enum reg_class vc4_regno_reg_class[FIRST_PSEUDO_REGISTER];
   *L1_D_CONTROL = tmp;                                                     \
   while ((*L1_D_CONTROL) & 6)                                              \
     /* empty.  */;                                                         \
-  *L1_IC0_FLUSH_S = _begin;                                                \
-  *L1_IC0_FLUSH_E = _end;                                                  \
-  *L1_IC1_FLUSH_S = _begin;                                                \
-  *L1_IC1_FLUSH_E = _end;                                                  \
+  *L1_IC0_FLUSH_S = (int) _begin;                                          \
+  *L1_IC0_FLUSH_E = (int) _end;                                            \
+  *L1_IC1_FLUSH_S = (int) _begin;                                          \
+  *L1_IC1_FLUSH_E = (int) _end;                                            \
   /* Flush icache.  (Maybe we should figure out which core we are running  \
      on rather than just flushing both caches?).  */                       \
   unsigned tmp1, tmp2;                                                     \
