@@ -647,7 +647,7 @@ vc4_compute_frame (void)
   offsets->local_vars_padding = padding_locals;
 
   /* Save callee-saved registers.  */
-  offsets->topreg = 0;
+  offsets->topreg = frame_pointer_needed ? HARD_FRAME_POINTER_REGNUM : 0;
 
   for (regno = 0; regno < FIRST_PSEUDO_REGISTER; regno++)
     if (df_regs_ever_live_p (regno) && (!call_used_regs[regno]))
