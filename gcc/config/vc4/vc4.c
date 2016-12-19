@@ -237,6 +237,20 @@ vc4_print_operand_address (FILE *stream, machine_mode /*mode*/, rtx x)
         output_operand_lossage ("invalid PLUS operand");
       break;
 
+    case POST_INC:
+      if (REG_P (XEXP (x, 0)))
+        asm_fprintf (stream, "(%r++)", REGNO (XEXP (x, 0)));
+      else
+        output_operand_lossage ("invalid POST_INC operand");
+      break;
+
+    case PRE_DEC:
+      if (REG_P (XEXP (x, 0)))
+        asm_fprintf (stream, "(--%r)", REGNO (XEXP (x, 0)));
+      else
+        output_operand_lossage ("invalid PRE_DEC operand");
+      break;
+
     default:
       output_addr_const (stream, x);
     }
@@ -1452,47 +1466,6 @@ vc4_scaled_index_addr_p (machine_mode mode, rtx x, bool strict_p)
 
 }
 
-static bool
-vc4_legitimate_address_p_1 (machine_mode mode, rtx x, bool strict)
-{
-  if (CONSTANT_ADDRESS_P (x))
-    return true;
-
-  if (vc4_address_register_p (x, strict))
-    return true;
-
-  if (GET_CODE (x) == PLUS
-      && vc4_address_register_p (XEXP (x, 0), strict)
-      && GET_CODE (XEXP (x, 1)) == CONST_INT
-      && INTVAL (XEXP (x, 1)) >= -0x4000000
-      && INTVAL (XEXP (x, 1)) < 0x4000000)
-    return true;
-
-  if (vc4_scaled_index_addr_p (mode, x, strict))
-    return true;
-
-  return false;
-}
-
-static bool
-vc4_legitimate_address_p (machine_mode mode, rtx x, bool strict)
-{
-  bool res;
-
-#if 0
-  fprintf (stderr, "check address: ");
-  dump_value_slim (stderr, x, 0);
-#endif
-
-  res = vc4_legitimate_address_p_1 (mode, x, strict);
-
-#if 0
-  fprintf (stderr, "  %s\n", (res ? "OK" : "unrecognized"));
-#endif
-
-  return res;
-}
-
 bool
 vc4_short_form_addr_p (machine_mode mode, rtx x, bool strict_p)
 {
@@ -1525,13 +1498,18 @@ vc4_short_form_addr_p (machine_mode mode, rtx x, bool strict_p)
   return false;
 }
 
+/* These are the address forms that can be used in the load/store insns with
+   a bitfield for conditional execution, although those don't actually seem to
+   work as predicable insns.  */
+
 bool
 vc4_conditional_form_addr_p (machine_mode mode, rtx x, bool strict_p)
 {
   if (vc4_scaled_index_addr_p (mode, x, strict_p))
     return true;
 
-  /* We can also support pre-decrement/post-increment here.  */
+  if (GET_CODE (x) == PRE_DEC || GET_CODE (x) == POST_INC)
+    return vc4_address_register_p (XEXP (x, 0), strict_p);
 
   return false;
 }
@@ -1588,6 +1566,34 @@ vc4_long_form_addr_p (machine_mode mode ATTRIBUTE_UNUSED, rtx x, bool strict_p)
     return true;
 
   return false;
+}
+
+static bool
+vc4_legitimate_address_p_1 (machine_mode mode, rtx x, bool strict_p)
+{
+  return (vc4_long_form_addr_p (mode, x, strict_p)
+	  || vc4_displacement_form_addr_p (mode, x, strict_p)
+	  || vc4_conditional_form_addr_p (mode, x, strict_p)
+	  || vc4_short_form_addr_p (mode, x, strict_p));
+}
+
+static bool
+vc4_legitimate_address_p (machine_mode mode, rtx x, bool strict)
+{
+  bool res;
+
+#if 0
+  fprintf (stderr, "check address: ");
+  dump_value_slim (stderr, x, 0);
+#endif
+
+  res = vc4_legitimate_address_p_1 (mode, x, strict);
+
+#if 0
+  fprintf (stderr, "  %s\n", (res ? "OK" : "unrecognized"));
+#endif
+
+  return res;
 }
 
 /*
