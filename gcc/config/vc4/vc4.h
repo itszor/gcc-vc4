@@ -607,6 +607,13 @@ extern const enum reg_class vc4_regno_reg_class[FIRST_PSEUDO_REGISTER];
 
 #define CASE_VECTOR_PC_RELATIVE 1
 
+#define CASE_VECTOR_SHORTEN_MODE(MIN, MAX, BODY)		\
+  (((MIN) >= -256 && (MAX) < 256)				\
+   ? (ADDR_DIFF_VEC_FLAGS (BODY).offset_unsigned = 0, QImode)	\
+   : ((MIN) >= -65536 && (MAX) < 65536)				\
+   ? (ADDR_DIFF_VEC_FLAGS (BODY).offset_unsigned = 0, HImode)	\
+   : SImode)
+
 #undef ASM_OUTPUT_CASE_LABEL
 #define ASM_OUTPUT_CASE_LABEL(STREAM, PREFIX, NUM, TABLE)    \
   do {							     \
@@ -615,8 +622,8 @@ extern const enum reg_class vc4_regno_reg_class[FIRST_PSEUDO_REGISTER];
 
 #define ASM_OUTPUT_CASE_END(STREAM, NUM, TABLE)		\
   do {							\
-    if (GET_MODE (PATTERN (TABLE)) == QImode)		\
-      ASM_OUTPUT_ALIGN (STREAM, 1);			\
+    if (GET_MODE (PATTERN (TABLE)) != SImode)		\
+      fprintf (STREAM, "\t.endswitch\n");		\
   } while (0)
 
 /* Assembler output control.  */
@@ -695,12 +702,20 @@ extern const enum reg_class vc4_regno_reg_class[FIRST_PSEUDO_REGISTER];
   sprintf (STRING, "*.%s%ld", PREFIX, (long) NUM)
 
 /* Output a relative address.  */
-#define ASM_OUTPUT_ADDR_DIFF_ELT(STREAM, BODY, VALUE, REL)  \
-  do { fprintf (STREAM, "\t.word .L%d-.L%d\n", VALUE, REL); } while (0)
-
-/* Output an element of a dispatch table.  */
-/*#define ASM_OUTPUT_ADDR_VEC_ELT(STREAM,VALUE)  \
-    fprintf (STREAM, "\t.long\t.L%d\n", VALUE)*/
+#define ASM_OUTPUT_ADDR_DIFF_ELT(STREAM, BODY, VALUE, REL) 	\
+  do {								\
+    switch (GET_MODE (BODY))					\
+      {								\
+      case QImode: case HImode:					\
+	fprintf (STREAM, "\t.case .L%d-.L%d\n", VALUE, REL);	\
+	break;							\
+      case SImode:						\
+	fprintf (STREAM, "\t.word .L%d-.L%d\n", VALUE, REL);	\
+	break;							\
+      default:							\
+        gcc_unreachable ();					\
+      }								\
+  } while (0)
 
 /* Output various types of constants.  */
 

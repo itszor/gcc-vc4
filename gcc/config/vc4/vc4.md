@@ -795,41 +795,54 @@
       operands[0] = reg;
     }
 
-  emit_jump_insn (gen_vc4_casesi_synthetic (operands[0], operands[2],
-					    operands[3], operands[4],
-					    force_reg (SImode,
-					      gen_rtx_LABEL_REF (Pmode,
-								 operands[3])),
-					    gen_reg_rtx (SImode)));
+  emit_jump_insn (gen_vc4_casesi (operands[0], operands[2], operands[3],
+				  operands[4], gen_reg_rtx (SImode),
+				  gen_reg_rtx (SImode)));
   DONE;
 })
 
-; This pattern implements a "generic"/unbounded synthetic switch statement,
-; then CASE_VECTOR_SHORTEN_MODE can transform it to shorter variants supported
-; by the hardware if possible.
-
-(define_insn "vc4_casesi_synthetic"
+(define_insn "vc4_casesi"
   [(parallel [(set (pc)
 	        (if_then_else
 		  (leu (match_operand:SI 0 "s_register_operand" "r")
 		       (match_operand:SI 1 "alu_rhs_operand" "i"))
-		  (plus:SI (match_operand:SI 4 "s_register_operand" "r")
+		  (plus:SI (label_ref (match_operand 2 "" ""))
 			   (mem:SI
 			     (plus:SI (mult:SI (match_dup 0) (const_int 4))
-			     (match_dup 4))))
+			     (label_ref (match_dup 2)))))
 		  (label_ref (match_operand 3 "" ""))))
+	      (clobber (match_operand:SI 4 "s_register_operand" "=&r"))
 	      (clobber (match_operand:SI 5 "s_register_operand" "=&r"))
 	      (clobber (reg:CC CC_REGNO))
-	      (use (label_ref (match_operand 2 "" "")))])]
+	      (use (label_ref (match_dup 2)))])]
   ""
 {
-  return "cmp\t%0,#%1"		"\;"
-	 "bgt\t%3"		"\;"
-	 "ld\t%5,(%4+%0<<2)"	"\;"
-	 "add\t%5,%5,%4"	"\;"
-	 "b\t%5";
+  rtx diff_vec = PATTERN (NEXT_INSN (as_a <rtx_insn *> (operands[2])));
+
+  gcc_assert (GET_CODE (diff_vec) == ADDR_DIFF_VEC);
+
+  switch (GET_MODE (diff_vec))
+    {
+    case QImode:
+    case HImode:
+      return "cmp\t%0,#%1"		"\;"
+	     "bhi\t%3"			"\;"
+	     "switch\t%0";
+
+    case SImode:
+      /* FIXME: This can be slightly shorter for non-PIC.  */
+      return "cmp\t%0,#%1"		"\;"
+	     "bhi\t%3"			"\;"
+	     "mov\t%4,#%2"		"\;"
+	     "ld\t%5,(%4+%0<<2)"	"\;"
+	     "add\t%5,%5,%4"		"\;"
+	     "b\t%5";
+
+    default:
+      gcc_unreachable ();
+    }
 }
-  [(set_attr "length" "20")
+  [(set_attr "length" "26")
    (set_attr "predicable" "no")]
 )
 
