@@ -825,6 +825,8 @@
     {
     case QImode:
     case HImode:
+      asm_fprintf (asm_out_file, "\t; %s switch\n",
+		   GET_MODE_NAME (GET_MODE (diff_vec)));
       return "cmp\t%0,#%1"		"\;"
 	     "bhi\t%3"			"\;"
 	     "switch\t%0";
