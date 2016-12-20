@@ -710,7 +710,7 @@ extern const enum reg_class vc4_regno_reg_class[FIRST_PSEUDO_REGISTER];
 	fprintf (STREAM, "\t.case .L%d-.L%d\n", VALUE, REL);	\
 	break;							\
       case SImode:						\
-	fprintf (STREAM, "\t.word .L%d-.L%d\n", VALUE, REL);	\
+	fprintf (STREAM, "\t.long .L%d-.L%d\n", VALUE, REL);	\
 	break;							\
       default:							\
         gcc_unreachable ();					\
