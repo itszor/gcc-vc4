@@ -38,6 +38,7 @@
 (define_mode_attr suffix [(QI "b") (HI "h") (SI "") (SF "")])
 
 (define_c_enum "unspec" [
+  UNSPEC_MSB
   UNSPEC_PRLG_STK
 ])
 
@@ -470,9 +471,21 @@
    (set_attr "predicable" "yes")]
 )
 
-(define_insn "clzsi2"
-  [(set (match_operand:SI 0 "s_register_operand"         "=f,r,  r,  r,r")
-	(clz:SI (match_operand:SI 1 "s_register_operand"  "f,r,Is6,IsX,i")))]
+(define_expand "clzsi2"
+  [(set (match_operand:SI 0 "s_register_operand")
+	(clz:SI (match_operand:SI 1 "alu_rhs_operand")))]
+  ""
+{
+  rtx tmp = gen_reg_rtx (SImode);
+  emit_insn (gen_vc4_msb (tmp, operands[1]));
+  emit_insn (gen_subsi3 (operands[0], gen_int_mode (31, SImode), tmp));
+  DONE;
+})
+
+(define_insn "vc4_msb"
+  [(set (match_operand:SI 0 "s_register_operand"	 "=f,r,  r,  r,r")
+	(unspec:SI [(match_operand:SI 1 "alu_rhs_operand" "f,r,Is6,IsX,i")]
+		   UNSPEC_MSB))]
   ""
   "@
   msb.s\t%0,%1
