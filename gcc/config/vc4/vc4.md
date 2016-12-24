@@ -352,6 +352,60 @@
    (set_attr "predicable" "no,no,yes,yes,yes,no,no")]
 )
 
+(define_insn "vc4_bitflip"
+  [(set (match_operand:SI 0 "s_register_operand"		  "=f,r")
+	(xor:SI
+	  (ashift:SI
+	    (const_int 1) (match_operand:SI 2 "s_register_operand" "f,r"))
+	  (match_operand:SI 1 "s_register_operand"		   "0,r")))]
+  ""
+  "@
+  bitflip.s\t%0,%2
+  bitflip%?.m\t%0,%1,%2"
+  [(set_attr "length" "2,4")
+   (set_attr "predicable" "no,yes")]
+)
+
+(define_insn "vc4_bic"
+  [(set (match_operand:SI 0 "s_register_operand"		"=f,r")
+	(and:SI (not:SI (match_operand:SI 2 "s_register_operand" "f,r"))
+		(match_operand:SI 1 "s_register_operand"	 "0,r")))]
+  ""
+  "@
+  bic.s\t%0,%2
+  bic%?.m\t%0,%1,%2"
+  [(set_attr "length" "2,4")
+   (set_attr "predicable" "no,yes")]
+)
+
+(define_insn "vc4_bitclear"
+  [(set (match_operand:SI 0 "s_register_operand"		    "=f,r")
+	(and:SI
+	  (rotate:SI
+	    (const_int -2) (match_operand:SI 2 "s_register_operand" "f,r"))
+	  (match_operand:SI 1 "s_register_operand"		     "0,r")))]
+  ""
+  "@
+  bitclear.s\t%0,%2
+  bitclear%?.m\t%0,%1,%2"
+  [(set_attr "length" "2,4")
+   (set_attr "predicable" "no,yes")]
+)
+
+(define_insn "vc4_bitset"
+  [(set (match_operand:SI 0 "s_register_operand"		  "=f,r")
+	(ior:SI
+	  (ashift:SI
+	    (const_int 1) (match_operand:SI 2 "s_register_operand" "f,r"))
+	  (match_operand:SI 1 "s_register_operand"		   "0,r")))]
+  ""
+  "@
+  bitset.s\t%0,%2
+  bitset%?.m\t%0,%1,%2"
+  [(set_attr "length" "2,4")
+   (set_attr "predicable" "no,yes")]
+)
+
 (define_insn "one_cmplsi2"
   [(set (match_operand:SI 0 "s_register_operand"        "=f,r")
 	(not:SI (match_operand:SI 1 "s_register_operand" "f,r")))]

@@ -580,7 +580,7 @@ extern const enum reg_class vc4_regno_reg_class[FIRST_PSEUDO_REGISTER];
 /* Shift counts are truncated to 6-bits (0 to 63) instead of the expected
    5-bits, so we can not define SHIFT_COUNT_TRUNCATED to true for this
    target.  */
-#define SHIFT_COUNT_TRUNCATED 0
+#define SHIFT_COUNT_TRUNCATED 1
 
 /* All integers have the same format so truncation is easy.  */
 #define TRULY_NOOP_TRUNCATION(OUTPREC,INPREC)  1
