@@ -986,9 +986,46 @@
    (set_attr "predicable" "no,no,yes,yes,no,no")]
 )
 
+(define_insn "*vc4_cmn_c"
+  [(set (reg:CC_C CC_REGNO)
+	(compare:CC_C
+	  (plus:SI
+	    (match_operand:SI 0 "s_register_operand" "f,  f,r,  r,  r,r")
+	    (match_operand:SI 1 "alu_rhs_operand"    "f,Iu5,r,Is6,IsX,i"))
+	  (match_dup 0)))]
+  ""
+  "@
+  cmn.s\t%0,%1
+  cmn.s\t%0,#%1
+  cmn%?.m\t%0,%1
+  cmn%?.m\t%0,#%1
+  cmn.m\t%0,#%1
+  cmn.l\t%0,#%1"
+  [(set_attr "length" "2,2,4,4,4,6")
+   (set_attr "predicable" "no,no,yes,yes,no,no")]
+)
+
+(define_insn "*vc4_cmn_z"
+  [(set (reg:CC_Z CC_REGNO)
+	(compare:CC_Z
+	  (neg:SI
+	    (match_operand:SI 1 "alu_rhs_operand"  "f,Iu5,r,Is6,IsX,i"))
+	  (match_operand:SI 0 "s_register_operand" "f,  f,r,  r,  r,r")))]
+  ""
+  "@
+  cmn.s\t%0,%1
+  cmn.s\t%0,#%1
+  cmn%?.m\t%0,%1
+  cmn%?.m\t%0,#%1
+  cmn.m\t%0,#%1
+  cmn.l\t%0,#%1"
+  [(set_attr "length" "2,2,4,4,4,6")
+   (set_attr "predicable" "no,no,yes,yes,no,no")]
+)
+
 (define_insn "*vc4_btest"
-  [(set (reg:CCZ CC_REGNO)
-	(compare:CCZ
+  [(set (reg:CC_Z CC_REGNO)
+	(compare:CC_Z
 	  (zero_extract:SI
 	    (match_operand:SI 0 "s_register_operand"  "f,  f,  r,  r")
 	    (const_int 1)

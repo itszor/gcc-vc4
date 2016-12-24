@@ -23,4 +23,8 @@ CC_MODE (CCFP);
 
 /* A mode for btest results (only Z valid).  */
 
-CC_MODE (CCZ);
+CC_MODE (CC_Z);
+
+/* A mode for CMN results (i.e. typical carry-out for add).  */
+
+CC_MODE (CC_C);

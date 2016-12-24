@@ -342,6 +342,22 @@ vc4_print_ccz_condition (FILE *stream, rtx_code code)
 }
 
 static void
+vc4_print_ccc_condition (FILE *stream, rtx_code code)
+{
+  switch (code)
+    {
+    case LTU:
+      fputs ("cs", stream);
+      break;
+    case GEU:
+      fputs ("cc", stream);
+      break;
+    default:
+      gcc_unreachable ();
+    }
+}
+
+static void
 vc4_print_condition (FILE *stream, machine_mode mode, rtx_code code)
 {
   switch (mode)
@@ -354,8 +370,12 @@ vc4_print_condition (FILE *stream, machine_mode mode, rtx_code code)
       vc4_print_ccfp_condition (stream, code);
       break;
 
-    case CCZmode:
+    case CC_Zmode:
       vc4_print_ccz_condition (stream, code);
+      break;
+
+    case CC_Cmode:
+      vc4_print_ccc_condition (stream, code);
       break;
 
     default:
@@ -1663,7 +1683,17 @@ vc4_select_cc_mode (rtx_code op, rtx x, rtx y)
   if ((op == EQ || op == NE)
       && (GET_CODE (x) == AND || GET_CODE (x) == ZERO_EXTRACT)
       && y == const0_rtx)
-    return CCZmode;
+    return CC_Zmode;
+
+  if ((op == EQ || op == NE)
+      && GET_CODE (x) == NEG
+      && (REG_P (y) || GET_CODE (y) == SUBREG))
+    return CC_Zmode;
+
+  if ((op == GEU || op == LTU)
+      && GET_CODE (x) == PLUS
+      && rtx_equal_p (y, XEXP (x, 0)))
+    return CC_Cmode;
 
   return CCmode;
 }
