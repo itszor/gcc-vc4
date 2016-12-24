@@ -20,3 +20,7 @@
 /* A mode for floating-point comparisons.  */
 
 CC_MODE (CCFP);
+
+/* A mode for btest results (only Z valid).  */
+
+CC_MODE (CCZ);

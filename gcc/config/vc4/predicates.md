@@ -65,3 +65,11 @@
 (define_predicate "extend_operand"
   (ior (match_operand 0 "s_register_operand")
        (match_operand 0 "memory_operand")))
+
+(define_predicate "bit_number_operand"
+  (and (match_code "const_int")
+       (match_test "INTVAL (op) >= 0 && INTVAL (op) < 32")))
+
+(define_predicate "btest_operand"
+  (ior (match_operand 0 "bit_number_operand")
+       (match_operand 0 "s_register_operand")))

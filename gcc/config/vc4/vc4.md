@@ -497,6 +497,17 @@
    (set_attr "predicable" "no,yes,yes,no,no")]
 )
 
+(define_insn "abssi2"
+  [(set (match_operand:SI 0 "s_register_operand"        "=f,r")
+	(abs:SI (match_operand:SI 1 "s_register_operand" "f,r")))]
+  ""
+  "@
+  abs.s\t%0,%1
+  abs%?.m\t%0,%1"
+  [(set_attr "length" "2")
+   (set_attr "predicable" "no,yes")]
+)
+
 ; I don't think it's actually possible to generate these saturating patterns
 ; (from C) at present.  We could add builtins.
 
@@ -865,30 +876,78 @@
 
 ;; Combined test-and-branch instructions.
 
-(define_expand "cbranchsi4"
-  [(set (reg:CC CC_REGNO) (compare:CC
-	                    (match_operand:SI 1 "register_operand" "")
-	                    (match_operand:SI 2 "nonmemory_operand" "")))
-   (set (pc) (if_then_else
-               (match_operator 0 "comparison_operator"
-                 [(reg:CC CC_REGNO) (const_int 0)])
-               (label_ref (match_operand 3 "" ""))
-               (pc)))]
+;(define_expand "cbranchsi4"
+;  [(set (reg:CC CC_REGNO) (compare:CC
+;	                    (match_operand:SI 1 "register_operand" "")
+;	                    (match_operand:SI 2 "nonmemory_operand" "")))
+;   (set (pc) (if_then_else
+;               (match_operator 0 "comparison_operator"
+;                 [(reg:CC CC_REGNO) (const_int 0)])
+;               (label_ref (match_operand 3 "" ""))
+;               (pc)))]
+;  ""
+;{
+;})
+
+(define_expand "cbranch_cc"
+  [(set (pc)
+        (if_then_else
+	  (match_operator 0 "" [(match_operand 1 "" "")
+				(match_operand 2 "" "")])
+	  (label_ref (match_operand 3 "" ""))
+	  (pc)))]
   ""
 {
+  machine_mode mode = SELECT_CC_MODE (GET_CODE (operands[0]), operands[1],
+				      operands[2]);
+  rtx cc_reg = gen_rtx_REG (mode, CC_REGNO);
+
+  emit_insn (gen_rtx_SET (cc_reg, gen_rtx_COMPARE (mode, operands[1],
+						   operands[2])));
+
+  operands[1] = cc_reg;
+  operands[2] = const0_rtx;
 })
 
-(define_expand "cbranchsf4"
-  [(set (reg:CCFP CC_REGNO) (compare:CCFP
-	                      (match_operand:SF 1 "register_operand" "")
-	                      (match_operand:SF 2 "register_operand" "")))
-   (set (pc) (if_then_else
-               (match_operator 0 "ordered_comparison_operator"
-                 [(reg:CCFP CC_REGNO) (const_int 0)])
-               (label_ref (match_operand 3 "" ""))
-               (pc)))]
+(define_expand "cbranchsi4"
+  [(set (pc) (if_then_else
+	       (match_operator 0 "comparison_operator"
+		 [(match_operand:SI 1 "s_register_operand" "")
+		  (match_operand:SI 2 "nonmemory_operand" "")])
+	       (label_ref (match_operand 3 "" ""))
+	       (pc)))]
   ""
 {
+  emit_jump_insn (gen_cbranch_cc (operands[0], operands[1], operands[2],
+				  operands[3]));
+  DONE;
+})
+
+;(define_expand "cbranchsf4"
+;  [(set (reg:CCFP CC_REGNO) (compare:CCFP
+;	                      (match_operand:SF 1 "register_operand" "")
+;	                      (match_operand:SF 2 "register_operand" "")))
+;   (set (pc) (if_then_else
+;               (match_operator 0 "ordered_comparison_operator"
+;                 [(reg:CCFP CC_REGNO) (const_int 0)])
+;               (label_ref (match_operand 3 "" ""))
+;               (pc)))]
+;  ""
+;{
+;})
+
+(define_expand "cbranchsf4"
+  [(set (pc) (if_then_else
+	       (match_operator 0 "comparison_operator"
+		 [(match_operand:SF 1 "s_register_operand" "")
+		  (match_operand:SF 2 "s_register_operand" "")])
+	       (label_ref (match_operand 3 "" ""))
+	       (pc)))]
+  ""
+{
+  emit_jump_insn (gen_cbranch_cc (operands[0], operands[1], operands[2],
+				  operands[3]));
+  DONE;
 })
 
 ;; This is disabled for now because it doesn't understand limited offset range.
@@ -909,7 +968,7 @@
 
 ;; Separated comparisons.
 
-(define_insn "*vc4_test_si"
+(define_insn "*vc4_cmp"
   [(set (reg:CC CC_REGNO)
         (compare:CC (match_operand:SI 0 "s_register_operand"
 							"f,  f,r,  r,  r,r")
@@ -927,7 +986,25 @@
    (set_attr "predicable" "no,no,yes,yes,no,no")]
 )
 
-(define_insn "*vc4_test_sf"
+(define_insn "*vc4_btest"
+  [(set (reg:CCZ CC_REGNO)
+	(compare:CCZ
+	  (zero_extract:SI
+	    (match_operand:SI 0 "s_register_operand"  "f,  f,  r,  r")
+	    (const_int 1)
+	    (match_operand:SI 1 "btest_operand"     "Iu5,  f,Iu5,  r"))
+	  (const_int 0)))]
+  ""
+  "@
+  btest.s\t%0,#%1
+  btest.s\t%0,%1
+  btest%?.m\t%0,#%1
+  btest%?.m\t%0,%1"
+  [(set_attr "length" "2,2,4,4")
+   (set_attr "predicable" "no,no,yes,yes")]
+)
+
+(define_insn "*vc4_fcmp"
   [(set (reg:CCFP CC_REGNO)
         (compare:CCFP (match_operand:SF 0 "s_register_operand" "r")
                       (match_operand:SF 1 "s_register_operand" "r")))]

@@ -74,6 +74,7 @@
 #include "builtins.h"
 #include "tm-constrs.h"
 #include "rtl-iter.h"
+#include "print-rtl.h"
 
 /* This file should be included last.  */
 #include "target-def.h"
@@ -325,6 +326,22 @@ vc4_print_ccfp_condition (FILE *stream, rtx_code code)
 }
 
 static void
+vc4_print_ccz_condition (FILE *stream, rtx_code code)
+{
+  switch (code)
+    {
+    case NE:
+      fputs ("ne", stream);
+      break;
+    case EQ:
+      fputs ("eq", stream);
+      break;
+    default:
+      gcc_unreachable ();
+    }
+}
+
+static void
 vc4_print_condition (FILE *stream, machine_mode mode, rtx_code code)
 {
   switch (mode)
@@ -335,6 +352,10 @@ vc4_print_condition (FILE *stream, machine_mode mode, rtx_code code)
 
     case CCFPmode:
       vc4_print_ccfp_condition (stream, code);
+      break;
+
+    case CCZmode:
+      vc4_print_ccz_condition (stream, code);
       break;
 
     default:
@@ -1328,6 +1349,17 @@ static bool vc4_warn_func_return(tree decl)
     return lookup_attribute("naked", DECL_ATTRIBUTES(decl)) == NULL_TREE;
 }
 
+bool
+vc4_hard_regno_mode_ok (int regno, machine_mode mode)
+{
+  if (GET_MODE_CLASS (mode) == MODE_CC)
+    return regno == CC_REGNO;
+
+  return (regno < AP_REG
+	  || regno == ARG_POINTER_REGNUM
+	  || regno == FRAME_POINTER_REGNUM);
+}
+
 /* TARGET_RETURN_IN_MEMORY: decides whether a value can be returned in
  * registers or must be written to memory.
  */
@@ -1620,6 +1652,20 @@ vc4_shiftable_const (HOST_WIDE_INT x)
     }
 
   return false;
+}
+
+machine_mode
+vc4_select_cc_mode (rtx_code op, rtx x, rtx y)
+{
+  if (GET_MODE_CLASS (GET_MODE (x)) == MODE_FLOAT)
+    return CCFPmode;
+
+  if ((op == EQ || op == NE)
+      && (GET_CODE (x) == AND || GET_CODE (x) == ZERO_EXTRACT)
+      && y == const0_rtx)
+    return CCZmode;
+
+  return CCmode;
 }
 
 /*

@@ -228,9 +228,8 @@ enum {
    (((GET_MODE_SIZE (MODE) + UNITS_PER_WORD - 1) / UNITS_PER_WORD))
 
 /* Value is 1 if hard register REGNO can hold a value of machine-mode MODE. */
-#define HARD_REGNO_MODE_OK(REGNO, MODE)			\
-  ((REGNO) < AP_REG || (REGNO) == ARG_POINTER_REGNUM	\
-   || (REGNO) == FRAME_POINTER_REGNUM)
+#define HARD_REGNO_MODE_OK(REGNO, MODE) \
+  vc4_hard_regno_mode_ok (REGNO, MODE)
 
 #define PRINT_OPERAND_PUNCT_VALID_P(CODE) ((CODE) == '?')
 
@@ -642,6 +641,8 @@ extern const enum reg_class vc4_regno_reg_class[FIRST_PSEUDO_REGISTER];
   ((COUNT) != 0 ? NULL_RTX : get_hard_reg_initial_val (Pmode, LR_REG))
 
 #define INCOMING_RETURN_ADDR_RTX gen_rtx_REG (Pmode, LR_REG)
+
+#define SELECT_CC_MODE(OP, X, Y) vc4_select_cc_mode (OP, X, Y)
 
 /* This is how to output an insn to push a register on the stack.
    It need not be very fast code.  */
