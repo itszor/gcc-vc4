@@ -363,6 +363,7 @@ vc4_print_condition (FILE *stream, machine_mode mode, rtx_code code)
   switch (mode)
     {
     case CCmode:
+    case SImode:
       vc4_print_cc_condition (stream, code);
       break;
 
@@ -825,7 +826,7 @@ vc4_emit_multi_reg_push (rtx par)
   if (lo_reg == hi_reg)
     {
       if (lo_reg == -1 && lr_included)
-	return "stm lr,(--sp)";
+	return "stm\tlr,(--sp)";
       else
         {
 	  operands[0] = gen_rtx_REG (SImode, lo_reg);
@@ -904,7 +905,7 @@ vc4_emit_multi_reg_pop (rtx par)
   if (lo_reg == hi_reg)
     {
       if (lo_reg == -1 && pc_included)
-	return "ldm pc, (sp++)";
+	return "ldm\tpc,(sp++)";
       else
         {
 	  operands[0] = gen_rtx_REG (SImode, lo_reg);

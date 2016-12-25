@@ -73,3 +73,6 @@
 (define_predicate "btest_operand"
   (ior (match_operand 0 "bit_number_operand")
        (match_operand 0 "s_register_operand")))
+
+(define_predicate "cmpbranch_operand"
+  (match_operand 0 "btest_operand"))

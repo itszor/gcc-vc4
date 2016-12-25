@@ -144,6 +144,8 @@
   [(set_attr "length" "2")]
 )
 
+; Length 4 here is a worst case (popping LR).
+
 (define_insn "vc4_pop_multi"
   [(match_parallel 0 "vc4_pop_multiple"
     [(set (match_operand:SI 1 "register_operand" "=r")
@@ -155,7 +157,7 @@
 {
   return vc4_emit_multi_reg_pop (operands[0]);
 }
-  [(set_attr "length" "2")]
+  [(set_attr "length" "4")]
 )
 
 (define_expand "prologue"
@@ -558,7 +560,7 @@
   "@
   abs.s\t%0,%1
   abs%?.m\t%0,%1"
-  [(set_attr "length" "2")
+  [(set_attr "length" "2,4")
    (set_attr "predicable" "no,yes")]
 )
 
@@ -771,8 +773,26 @@
 (define_insn "jump"
   [(set (pc) (label_ref (match_operand 0 "" "")))]
   ""
-  "b\t%l0"
-  [(set_attr "length" "2")]
+{
+  switch (get_attr_length (insn))
+    {
+    case 2: return "b.s\t%l0";
+    case 4: return "b.m\t%l0";
+    case 6: return "b.l\t%l0";
+    default: gcc_unreachable ();
+    }
+}
+  [(set (attr "length")
+	(if_then_else
+	  (and (ge (minus (match_dup 0) (pc)) (const_int -128))
+	       (lt (minus (match_dup 0) (pc)) (const_int 128)))
+	  (const_int 2)
+	  (if_then_else
+	    (and (ge (minus (match_dup 0) (pc)) (const_int -8388608))
+		 (lt (minus (match_dup 0) (pc)) (const_int 8388608)))
+	    (const_int 4)
+	    (const_int 6))))
+   (set_attr "predicable" "no")]
 )
 
 ;; Call a function with no return value.
@@ -788,6 +808,7 @@
          (match_operand 1 "const_int_operand"))]
   ""
   "bl\t%0"
+  [(set_attr "length" "4")]
 )
 
 (define_insn "*vc4_call_indirect"
@@ -813,6 +834,7 @@
 	      (match_operand 2 "const_int_operand")))]
   ""
   "bl\t%1"
+  [(set_attr "length" "4")]
 )
 
 (define_insn "*vc4_call_value_indirect"
@@ -855,7 +877,9 @@
 {
   vc4_set_return_address (operands[0], operands[1]);
   DONE;
-})
+}
+  [(set_attr "length" "4")]
+)
 
 (define_expand "casesi"
   [(match_operand:SI 0 "s_register_operand" "") ; index
@@ -1102,7 +1126,7 @@
   ""
   "fcmp%?\t%0,%1"
   [(set_attr "length" "4")
-   (set_attr "predicable" "yes")]
+   (set_attr "predicable" "no")]
 )
 
 (define_insn "*vc4_branch"
@@ -1112,8 +1136,63 @@
           (label_ref (match_operand 0 "" ""))
           (pc)))]
   ""
-  "b%c1\t%0"
-  [(set_attr "length" "4")]
+{
+  if (get_attr_length (insn) == 2)
+    return "b%c1.s\t%0";
+  else
+    return "b%c1.m\t%0";
+}
+  [(set (attr "length")
+	(if_then_else
+	  (and (ge (minus (match_dup 0) (pc)) (const_int -128))
+	       (lt (minus (match_dup 0) (pc)) (const_int 126)))
+	  (const_int 2)
+	  (const_int 4)))
+   (set_attr "predicable" "no")]
+)
+
+(define_insn "*vc4_cmpbranch"
+  [(set (pc)
+        (if_then_else
+	  (match_operator 0 "ordered_comparison_operator"
+	    [(match_operand:SI 1 "s_register_operand" "f,  f")
+	     (match_operand:SI 2 "cmpbranch_operand"  "f,Iu5")])
+	  (label_ref (match_operand 3 "" ""))
+	  (pc)))
+   (clobber (reg:CC CC_REGNO))]
+  ""
+{
+  switch (which_alternative)
+    {
+    case 0:
+      if (get_attr_length (insn) == 4)
+        return "b%c0\t%1,%2,%3";
+      else
+	return "cmp.s\t%1,%2\;b%c0.m\t%3";
+
+    case 1:
+      if (get_attr_length (insn) == 4)
+        return "b%c0\t%1,#%2,%3";
+      else
+	return "cmp.s\t%1,#%2\;b%c0.m\t%3";
+
+    default:
+      gcc_unreachable ();
+    }
+}
+  [(set (attr "length")
+        (if_then_else
+	  (and (match_test "which_alternative == 0")
+	       (ge (minus (match_dup 3) (pc)) (const_int -1024))
+	       (lt (minus (match_dup 3) (pc)) (const_int 1020)))
+	  (const_int 4)
+	  (if_then_else
+	    (and (match_test "which_alternative == 1")
+		 (ge (minus (match_dup 3) (pc)) (const_int -256))
+		 (lt (minus (match_dup 3) (pc)) (const_int 252)))
+	    (const_int 4)
+	    (const_int 6))))
+   (set_attr "predicable" "no")]
 )
 
 ; General conditional execution.
