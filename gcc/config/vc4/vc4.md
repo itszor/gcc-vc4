@@ -989,7 +989,7 @@
 
 (define_expand "cbranchsi4"
   [(set (pc) (if_then_else
-	       (match_operator 0 "comparison_operator"
+	       (match_operator 0 "ordered_comparison_operator"
 		 [(match_operand:SI 1 "s_register_operand" "")
 		  (match_operand:SI 2 "nonmemory_operand" "")])
 	       (label_ref (match_operand 3 "" ""))
@@ -1016,7 +1016,7 @@
 
 (define_expand "cbranchsf4"
   [(set (pc) (if_then_else
-	       (match_operator 0 "comparison_operator"
+	       (match_operator 0 "ordered_comparison_operator"
 		 [(match_operand:SF 1 "s_register_operand" "")
 		  (match_operand:SF 2 "s_register_operand" "")])
 	       (label_ref (match_operand 3 "" ""))
