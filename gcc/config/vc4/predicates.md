@@ -81,6 +81,19 @@
   (and (match_code "const_int")
        (match_test "INTVAL (op) >= -8 && INTVAL (op) < 8")))
 
+(define_predicate "low_register_operand"
+  (match_code "reg,subreg")
+{
+  if (GET_CODE (op) == SUBREG)
+    op = SUBREG_REG (op);
+
+  return REG_P (op) && REGNO (op) < 16;
+})
+
 (define_predicate "addcmpbranch_operand"
-  (ior (match_operand 0 "s_register_operand")
+  (ior (match_operand 0 "low_register_operand")
        (match_operand 0 "s4_immediate_operand")))
+
+(define_predicate "low_cmpbranch_operand"
+  (ior (match_operand 0 "low_register_operand")
+       (match_operand 0 "bit_number_operand")))
