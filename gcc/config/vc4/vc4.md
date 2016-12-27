@@ -1155,8 +1155,8 @@
   [(set (pc)
         (if_then_else
 	  (match_operator 0 "ordered_comparison_operator"
-	    [(match_operand:SI 1 "s_register_operand" "f,  f")
-	     (match_operand:SI 2 "cmpbranch_operand"  "f,Iu5")])
+	    [(match_operand:SI 1 "s_register_operand" "f,  f,r,  r")
+	     (match_operand:SI 2 "cmpbranch_operand"  "f,Iu5,r,Iu5")])
 	  (label_ref (match_operand 3 "" ""))
 	  (pc)))
    (clobber (reg:CC CC_REGNO))]
@@ -1176,24 +1176,134 @@
       else
 	return "cmp.s\t%1,#%2\;b%c0.m\t%3";
 
+    case 2:
+      return "cmp.m\t%1,%2\;b%c0.m\t%3";
+
+    case 3:
+      return "cmp.m\t%1,#%2\;b%c0.m\t%3";
+
     default:
       gcc_unreachable ();
     }
 }
   [(set (attr "length")
-        (if_then_else
-	  (and (match_test "which_alternative == 0")
-	       (ge (minus (match_dup 3) (pc)) (const_int -1024))
-	       (lt (minus (match_dup 3) (pc)) (const_int 1020)))
-	  (const_int 4)
-	  (if_then_else
-	    (and (match_test "which_alternative == 1")
-		 (ge (minus (match_dup 3) (pc)) (const_int -256))
-		 (lt (minus (match_dup 3) (pc)) (const_int 252)))
-	    (const_int 4)
-	    (const_int 6))))
+        (cond
+	  [(match_test "which_alternative == 0")
+	   (if_then_else
+	     (and (ge (minus (match_dup 3) (pc)) (const_int -1024))
+		  (lt (minus (match_dup 3) (pc)) (const_int 1020)))
+	     (const_int 4)
+	     (const_int 6))
+
+	   (match_test "which_alternative == 1")
+	   (if_then_else
+	     (and (ge (minus (match_dup 3) (pc)) (const_int -256))
+		  (lt (minus (match_dup 3) (pc)) (const_int 252)))
+	     (const_int 4)
+	     (const_int 6))]
+	  (const_int 8)))
    (set_attr "predicable" "no")]
 )
+
+; This might be better done as a peephole2.  Not sure.
+
+;(define_insn "*vc4_addcmpbranch"
+;  [(set (pc)
+;	(if_then_else
+;	  (match_operator 3 "ordered_comparison_operator"
+;	    [(plus:SI (match_dup 1) (match_dup 2))
+;	     (match_operand:SI 4 "cmpbranch_operand"
+;					      "f,Iu5,  f,Iu5,r,Iu5,  r,Iu5")])
+;	  (label_ref (match_operand 5 "" ""))
+;	  (pc)))
+;   (set (match_operand:SI 0 "s_register_operand"
+;   					     "=f,  f,  f,  f,r,  r,  r,  r")
+;	(plus:SI (match_operand:SI 1 "s_register_operand"
+;					     "%0,  0,  0,  0,r,  r,  r,  r")
+;	         (match_operand:SI 2 "addcmpbranch_operand"
+;					      "f,  f,Is4,Is4,r,  r,Is4,Is4")))
+;   (clobber (reg:CC CC_REGNO))]
+;  ""
+;{
+;  switch (which_alternative)
+;    {
+;    case 0:
+;      if (get_attr_length (insn) == 4)
+;	return "addcmpb%c3\t%0,%2,%4,%5";
+;      else
+;	return "add.s\t%0,%2\;cmp.s\t%0,%4\;b%c3.m\t%5";
+;
+;    case 1:
+;      if (get_attr_length (insn) == 4)
+;	return "addcmpb%c3\t%0,%2,#%4,%5";
+;      else
+;	return "add.s\t%0,%2\;cmp.s\t%0,#%4\;b%c3.m\t%5";
+;
+;    case 2:
+;      if (get_attr_length (insn) == 4)
+;	return "addcmpb%c3\t%0,#%2,%4,%5";
+;      else
+;        {
+;	  HOST_WIDE_INT diff = INTVAL (operands[2]);
+;	  if (diff >= 0)
+;	    return "add.s\t%0,#%2\;cmp.s\t%0,%4\;b%c3.m\t%5";
+;	  else
+;	    {
+;	      operands[2] = GEN_INT (-diff);
+;	      return "sub.s\t%0,#%2\;cmp.s\t%0,%4\;b%c3.m\t%5";
+;	    }
+;	}
+;
+;    case 3:
+;      if (get_attr_length (insn) == 4)
+;	return "addcmpb%c3\t%0,#%2,#%4,%5";
+;      else
+;        {
+;	  HOST_WIDE_INT diff = INTVAL (operands[2]);
+;	  if (diff >= 0)
+;	    return "add.s\t%0,#%2\;cmp.s\t%0,#%4\;b%c3.m\t%5";
+;	  else
+;	    {
+;	      operands[2] = GEN_INT (-diff);
+;	      return "sub.s\t%0,#%2\;cmp.s\t%0,#%4\;b%c3.m\t%5";
+;	    }
+;	}
+;
+;    /* These have some shorter equivalents, depending on operands.  */
+;    case 4:
+;      return "add.m\t%0,%1,%2\;cmp\t%0,%4\;b%c3.m\t%5";
+;
+;    case 5:
+;      return "add.m\t%0,%1,%2\;cmp\t%0,#%4\;b%c3.m\t%5";
+;
+;    case 6:
+;      return "add.m\t%0,%1,#%2\;cmp\t%0,%4\;b%c3.m\t%5";
+;
+;    case 7:
+;      return "add.m\t%0,%1,#%2\;cmp\t%0,#%4\;b%c3.m\t%5";
+;
+;    default:
+;      gcc_unreachable ();
+;    }
+;}
+;  [(set (attr "length")
+;	(cond
+;	  [(match_test "which_alternative == 0 || which_alternative == 2")
+;	   (if_then_else
+;	     (and (ge (minus (match_dup 5) (pc)) (const_int -1024))
+;		  (lt (minus (match_dup 5) (pc)) (const_int 1020)))
+;	     (const_int 4)
+;	     (const_int 8))
+;
+;	   (match_test "which_alternative == 1 || which_alternative == 3")
+;	   (if_then_else
+;	     (and (ge (minus (match_dup 5) (pc)) (const_int -256))
+;		  (lt (minus (match_dup 5) (pc)) (const_int 252)))
+;	     (const_int 4)
+;	     (const_int 8))]
+;	  (const_int 12)))
+;   (set_attr "predicable" "no")]
+;)
 
 ; General conditional execution.
 (define_cond_exec

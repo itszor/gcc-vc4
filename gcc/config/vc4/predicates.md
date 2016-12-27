@@ -76,3 +76,11 @@
 
 (define_predicate "cmpbranch_operand"
   (match_operand 0 "btest_operand"))
+
+(define_predicate "s4_immediate_operand"
+  (and (match_code "const_int")
+       (match_test "INTVAL (op) >= -8 && INTVAL (op) < 8")))
+
+(define_predicate "addcmpbranch_operand"
+  (ior (match_operand 0 "s_register_operand")
+       (match_operand 0 "s4_immediate_operand")))

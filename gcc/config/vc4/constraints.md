@@ -72,6 +72,11 @@
   (and (match_code "const_int")
        (match_test "IN_RANGE (~ival, 0, 31)")))
 
+(define_constraint "Is4"
+  "An 4-bit signed integer in the range -8 to 7."
+  (and (match_code "const_int")
+       (match_test "IN_RANGE (ival, -8, 7)")))
+
 (define_constraint "Is6"
   "An 6-bit signed integer in the range -32 to 31, used in conditional ALU ops."
   (and (match_code "const_int")
