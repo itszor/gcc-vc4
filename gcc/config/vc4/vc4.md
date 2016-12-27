@@ -785,11 +785,11 @@
   [(set (attr "length")
 	(if_then_else
 	  (and (ge (minus (match_dup 0) (pc)) (const_int -128))
-	       (lt (minus (match_dup 0) (pc)) (const_int 128)))
+	       (lt (minus (match_dup 0) (pc)) (const_int 126)))
 	  (const_int 2)
 	  (if_then_else
 	    (and (ge (minus (match_dup 0) (pc)) (const_int -8388608))
-		 (lt (minus (match_dup 0) (pc)) (const_int 8388608)))
+		 (lt (minus (match_dup 0) (pc)) (const_int 8388604)))
 	    (const_int 4)
 	    (const_int 6))))
    (set_attr "predicable" "no")]
