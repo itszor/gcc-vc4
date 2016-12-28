@@ -39,6 +39,9 @@
 
 (define_c_enum "unspec" [
   UNSPEC_MSB
+  UNSPEC_SMULSI_HIGHPART
+  UNSPEC_UMULSI_HIGHPART
+  UNSPEC_USMULSI_HIGHPART
   UNSPEC_PRLG_STK
 ])
 
@@ -562,6 +565,123 @@
   abs%?.m\t%0,%1"
   [(set_attr "length" "2,4")
    (set_attr "predicable" "no,yes")]
+)
+
+(define_insn "vc4_signext"
+  [(set (match_operand:SI 0 "s_register_operand"  "=f,  f,r,  r")
+	(sign_extract:SI
+	  (match_operand:SI 1 "s_register_operand" "0,  0,r,  r")
+	  (match_operand:SI 2 "btest_operand"      "f,Iu5,r,Iu5")
+	  (const_int 0)))]
+  ""
+  "@
+  signext.s\t%0,%2
+  signext.s\t%0,#%2
+  signext%?.m\t%0,%1,%2
+  signext%?.m\t%0,%1,#%2"
+  [(set_attr "length" "2,2,4,4")
+   (set_attr "predicable" "no,no,yes,yes")]
+)
+
+(define_insn "vc4_zeroext"
+  [(set (match_operand:SI 0 "s_register_operand"  "=f,  f,r,  r")
+	(zero_extract:SI
+	  (match_operand:SI 1 "s_register_operand" "0,  0,r,  r")
+	  (match_operand:SI 2 "btest_operand"      "f,Iu5,r,Iu5")
+	  (const_int 0)))]
+  ""
+  "@
+  bmask.s\t%0,%2
+  bmask.s\t%0,#%2
+  bmask%?.m\t%0,%1,%2
+  bmask%?.m\t%0,%1,#%2"
+  [(set_attr "length" "2,2,4,4")
+   (set_attr "predicable" "no,no,yes,yes")]
+)
+
+(define_insn "smulsi3_highpart"
+  [(set (match_operand:SI 0 "s_register_operand"	    "=r,  r")
+	(unspec:SI [(match_operand:SI 1 "s_register_operand" "r,  r")
+		    (match_operand:SI 2 "alu_rhs_operand"    "r,Is6")]
+		   UNSPEC_SMULSI_HIGHPART))]
+  ""
+  "@
+  mulhd%?.ss\t%0,%1,%2
+  mulhd%?.ss\t%0,%1,#%2"
+  [(set_attr "length" "4")
+   (set_attr "predicable" "yes")]
+)
+
+(define_insn "umulsi3_highpart"
+  [(set (match_operand:SI 0 "s_register_operand"	    "=r,  r")
+	(unspec:SI [(match_operand:SI 1 "s_register_operand" "r,  r")
+		    (match_operand:SI 2 "alu_rhs_operand"    "r,Is6")]
+		   UNSPEC_UMULSI_HIGHPART))]
+  ""
+  "@
+  mulhd%?.uu\t%0,%1,%2
+  mulhd%?.uu\t%0,%1,#%2"
+  [(set_attr "length" "4")
+   (set_attr "predicable" "yes")]
+)
+
+(define_expand "mulsidi3"
+  [(set (match_operand:DI 0 "s_register_operand" "")
+	(mult:DI
+	  (sign_extend:DI (match_operand:SI 1 "alu_rhs_operand" ""))
+	  (sign_extend:DI (match_operand:SI 2 "alu_rhs_operand" ""))))]
+  ""
+{
+  rtx tmp = gen_reg_rtx (SImode);
+  emit_insn (gen_mulsi3 (tmp, operands[1], operands[2]));
+  emit_insn (gen_smulsi3_highpart (gen_highpart_mode (SImode, DImode,
+	     operands[0]), operands[1], operands[2]));
+  emit_move_insn (gen_lowpart (SImode, operands[0]), tmp);
+  DONE;
+})
+
+(define_expand "umulsidi3"
+  [(set (match_operand:DI 0 "s_register_operand" "")
+	(mult:DI
+	  (sign_extend:DI (match_operand:SI 1 "alu_rhs_operand" ""))
+	  (sign_extend:DI (match_operand:SI 2 "alu_rhs_operand" ""))))]
+  ""
+{
+  rtx tmp = gen_reg_rtx (SImode);
+  emit_insn (gen_mulsi3 (tmp, operands[1], operands[2]));
+  emit_insn (gen_umulsi3_highpart (gen_highpart_mode (SImode, DImode,
+	     operands[0]), operands[1], operands[2]));
+  emit_move_insn (gen_lowpart (SImode, operands[0]), tmp);
+  DONE;
+})
+
+(define_expand "usmulsidi3"
+  [(set (match_operand:DI 0 "s_register_operand" "")
+	(mult:DI
+	  (zero_extend:DI (match_operand:SI 1 "alu_rhs_operand" ""))
+	  (sign_extend:DI (match_operand:SI 2 "alu_rhs_operand" ""))))]
+  ""
+{
+  rtx tmp = gen_reg_rtx (SImode);
+  emit_insn (gen_mulsi3 (tmp, operands[1], operands[2]));
+  emit_insn (gen_vc4_usmulsi3_highpart (gen_highpart_mode (SImode, DImode,
+	     operands[0]), operands[1], operands[2]));
+  emit_move_insn (gen_lowpart (SImode, operands[0]), tmp);
+  DONE;
+})
+
+(define_insn "vc4_usmulsi3_highpart"
+  [(set (match_operand:SI 0 "s_register_operand"	 "=r,  r,  r")
+	(unspec:SI [(match_operand:SI 1 "alu_rhs_operand" "r,  r,Is6")
+		    (match_operand:SI 2 "alu_rhs_operand" "r,Is6,  r")]
+		   UNSPEC_USMULSI_HIGHPART))]
+  ""
+  "@
+  mulhd%?.us\t%0,%1,%2
+  mulhd%?.us\t%0,%1,#%2
+  mulhd%?.su\t%0,%2,#%1"
+  [(set_attr "length" "4")
+   (set_attr "predicable" "yes")]
 )
 
 ; I don't think it's actually possible to generate these saturating patterns
