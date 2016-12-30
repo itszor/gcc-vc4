@@ -745,12 +745,6 @@
 ;; These are mostly simple 2op and 3op instructions and can be generated
 ;; algorithmically.
 
-(define_code_iterator fpu_list_2op
-  [
-    abs
-  ]
-)
-
 (define_code_iterator fpu_list_3op
   [
     plus
@@ -768,7 +762,6 @@
     (mult "mulsf3")
     (smin "sminsf3")
     (smax "smaxsf3")
-    (abs "abssf2")
   ]
 )
 
@@ -780,7 +773,6 @@
     (mult "fmul")
     (smin "fmin")
     (smax "fmax")
-    (abs "fabs")
   ]
 )
 
@@ -802,15 +794,18 @@
    (set_attr "predicable" "no")]
 )
 
-(define_insn "<fpu_list_2op:fpu_insn>"
-  [(set (match_operand:SF 0 "s_register_operand"		"=r,r")
-	(fpu_list_2op:SF (match_operand:SF 1 "float_rhs_operand" "r,F")))]
+; NOTE: The "fabs" instruction doesn't seem to do the expected thing, so fake
+; this with an integer instruction instead.
+
+(define_insn "abssf2"
+  [(set (match_operand:SF 0 "s_register_operand"	"=f,r")
+	(abs:SF (match_operand:SF 1 "s_register_operand" "0,r")))]
   ""
   "@
-  <fpu_list_2op:fpu_opcode>\t%0,%1
-  <fpu_list_2op:fpu_opcode>\t%0,#%f1"
-  [(set_attr "length" "4")
-   (set_attr "predicable" "no")]
+   bitclear.s\t%0,#31\t; fabs
+   bitclear%?.m\t%0,%1,#31\t; fabs"
+  [(set_attr "length" "2,4")
+   (set_attr "predicable" "no,yes")]
 )
 
 (define_insn "subsf3"
