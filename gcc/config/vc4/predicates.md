@@ -74,6 +74,11 @@
   (ior (match_operand 0 "bit_number_operand")
        (match_operand 0 "s_register_operand")))
 
+(define_predicate "signext_operand"
+  (ior (match_operand 0 "s_register_operand")
+       (and (match_code "const_int")
+	    (match_test "INTVAL (op) > 0 && INTVAL (op) <= 32"))))
+
 (define_predicate "cmpbranch_operand"
   (match_operand 0 "btest_operand"))
 
@@ -97,3 +102,14 @@
 (define_predicate "low_cmpbranch_operand"
   (ior (match_operand 0 "low_register_operand")
        (match_operand 0 "bit_number_operand")))
+
+(define_predicate "float_rhs_operand"
+  (ior (match_operand 0 "s_register_operand")
+       (and (match_code "const_double")
+	    (match_test "vc4_valid_float_immediate (op)"))))
+
+(define_predicate "float_div_lhs"
+  (ior (match_operand 0 "s_register_operand")
+       (and (match_code "const_double")
+	    (match_test "real_equal (CONST_DOUBLE_REAL_VALUE (op),
+				     &dconst1)"))))

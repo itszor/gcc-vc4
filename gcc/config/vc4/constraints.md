@@ -134,6 +134,11 @@
   (and (match_code "const_int")
        (match_test "IN_RANGE (~ival, -32768, 32767)")))
 
+(define_constraint "G01"
+  "Floating-point 1.0"
+  (and (match_code "const_double")
+       (match_test "real_equal (CONST_DOUBLE_REAL_VALUE (op), &dconst1)")))
+
 (define_memory_constraint "Us"
   "A memory operand suitable for short-form memory ops."
   (and (match_code "mem")

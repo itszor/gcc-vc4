@@ -43,5 +43,5 @@ extern bool vc4_shiftable_const (HOST_WIDE_INT);
 extern machine_mode vc4_select_cc_mode (RTX_CODE, rtx, rtx);
 #endif
 extern bool vc4_hard_regno_mode_ok (int regno, machine_mode mode);
-
+extern bool vc4_valid_float_immediate (rtx x);
 #endif

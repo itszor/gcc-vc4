@@ -423,6 +423,22 @@ vc4_print_operand (FILE *stream, rtx x, int code)
         }
 	break;
 
+      case 'd':
+	{
+	  gcc_assert (CONST_INT_P (x));
+	  asm_fprintf (stream, "%d", INTVAL (x) - 1);
+	}
+	break;
+
+      case 'f':
+	{
+	  char fpstr[20];
+	  real_to_decimal (fpstr, CONST_DOUBLE_REAL_VALUE (x), sizeof (fpstr),
+			   0, 1);
+	  fprintf (stream, "%s", fpstr);
+	}
+	break;
+
       case '?':
 	if (current_insn_predicate)
 	  {
@@ -1697,6 +1713,72 @@ vc4_select_cc_mode (rtx_code op, rtx x, rtx y)
     return CC_Cmode;
 
   return CCmode;
+}
+
+/* This is adapted from arm.c:vfp3_const_double_index, though the
+   representable number range is somewhat different.  */
+
+bool
+vc4_valid_float_immediate (rtx x)
+{
+  REAL_VALUE_TYPE r, m;
+  int exponent;
+  unsigned HOST_WIDE_INT mantissa, mant_hi;
+  unsigned HOST_WIDE_INT mask;
+  int point_pos = 2 * HOST_BITS_PER_WIDE_INT - 1;
+  bool fail;
+
+  if (!CONST_DOUBLE_P (x))
+    return false;
+
+  r = *CONST_DOUBLE_REAL_VALUE (x);
+
+  if (REAL_VALUE_ISINF (r) || REAL_VALUE_ISNAN (r) || REAL_VALUE_MINUS_ZERO (r))
+    return false;
+
+  r = real_value_abs (&r);
+  exponent = REAL_EXP (&r);
+  /* For the mantissa, we expand into two HOST_WIDE_INTS, apart from the
+     highest (sign) bit, with a fixed binary point at bit point_pos.  */
+  real_ldexp (&m, &r, point_pos - exponent);
+  wide_int w = real_to_integer (&m, &fail, HOST_BITS_PER_WIDE_INT * 2);
+  mantissa = w.elt (0);
+  mant_hi = w.elt (1);
+
+  /* If there are bits set in the low part of the mantissa, we can't
+     represent this value.  */
+  if (mantissa != 0)
+    return false;
+
+  /* Now make it so that mantissa contains the most-significant bits, and move
+     the point_pos to indicate that the least-significant bits have been
+     discarded.  */
+  point_pos -= HOST_BITS_PER_WIDE_INT;
+  mantissa = mant_hi;
+
+  /* We permit 2 bits of mantissa only, plus a high bit which is always 1.  */
+  mask = ((unsigned HOST_WIDE_INT) 1 << (point_pos - 3)) - 1;
+  if ((mantissa & mask) != 0)
+    return false;
+
+  /* Now we know the mantissa is in range, chop off the unneeded bits.  */
+  mantissa >>= point_pos - 3;
+
+  /* The mantissa may be zero. Disallow that case.  */
+  if (mantissa == 0)
+    return false;
+
+  /* Sanity check: two bits of mantissa, plus an always-on third bit.  */
+  gcc_assert (mantissa >= 4 && mantissa <= 7);
+
+  /* Adjust the exponent to match the required range (wrt. GCC's internal
+     exponent bias and that of the VC4's compact float representation).  */
+  exponent += 2;
+
+  if (exponent < 0 || exponent > 7)
+    return false;
+
+  return true;
 }
 
 /*

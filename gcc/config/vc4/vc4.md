@@ -42,6 +42,11 @@
   UNSPEC_SMULSI_HIGHPART
   UNSPEC_UMULSI_HIGHPART
   UNSPEC_USMULSI_HIGHPART
+  UNSPEC_FLOOR
+  UNSPEC_CEIL
+  UNSPEC_LOG2
+  UNSPEC_EXP2
+  UNSPEC_RSQRT
   UNSPEC_PRLG_STK
 ])
 
@@ -567,20 +572,44 @@
    (set_attr "predicable" "no,yes")]
 )
 
-(define_insn "vc4_signext"
+(define_insn_and_split "vc4_signext"
   [(set (match_operand:SI 0 "s_register_operand"  "=f,  f,r,  r")
 	(sign_extract:SI
 	  (match_operand:SI 1 "s_register_operand" "0,  0,r,  r")
-	  (match_operand:SI 2 "btest_operand"      "f,Iu5,r,Iu5")
+	  (match_operand:SI 2 "signext_operand"	   "f,Iu5,r,Iu5")
+	  (const_int 0)))
+   (clobber (match_scratch:SI 3 "=&r,X,&r,X"))]
+  ""
+  "@
+  #
+  signext.s\t%0,#%d2
+  #
+  signext%?.m\t%0,%1,#%d2"
+  "s_register_operand (operands[2], SImode)"
+  [(set (match_dup 3) (minus:SI (match_dup 2) (const_int 1)))
+   (set (match_dup 0)
+	(sign_extract:SI
+	  (match_dup 1)
+	  (plus:SI (match_dup 3) (const_int 1))
+	  (const_int 0)))]
+  ""
+  [(set_attr "length" "6,2,8,4")
+   (set_attr "predicable" "no,no,no,yes")]
+)
+
+(define_insn "vc4_signext_reg"
+  [(set (match_operand:SI 0 "s_register_operand"	   "=f,r")
+	(sign_extract:SI
+	  (match_operand:SI 1 "s_register_operand"	    "0,r")
+	  (plus:SI (match_operand:SI 2 "s_register_operand" "f,r")
+		   (const_int 1))
 	  (const_int 0)))]
   ""
   "@
   signext.s\t%0,%2
-  signext.s\t%0,#%2
-  signext%?.m\t%0,%1,%2
-  signext%?.m\t%0,%1,#%2"
-  [(set_attr "length" "2,2,4,4")
-   (set_attr "predicable" "no,no,yes,yes")]
+  signext%?.m\t%0,%1,%2"
+  [(set_attr "length" "2,4")
+   (set_attr "predicable" "no,yes")]
 )
 
 (define_insn "vc4_zeroext"
@@ -725,9 +754,7 @@
 (define_code_iterator fpu_list_3op
   [
     plus
-    minus
     mult
-    div
     smin
     smax
   ]
@@ -739,8 +766,6 @@
   [
     (plus "addsf3")
     (mult "mulsf3")
-    (minus "subsf3")
-    (div "divsf3")
     (smin "sminsf3")
     (smax "smaxsf3")
     (abs "abssf2")
@@ -753,8 +778,6 @@
   [
     (plus "fadd")
     (mult "fmul")
-    (minus "fsub")
-    (div "fdiv")
     (smin "fmin")
     (smax "fmax")
     (abs "fabs")
@@ -767,21 +790,143 @@
 ; assembler encoding suggests that they would.
 
 (define_insn "<fpu_list_3op:fpu_insn>"
-  [(set (match_operand:SF 0 "s_register_operand" "=r")
+  [(set (match_operand:SF 0 "s_register_operand"  "=r,r")
 	(fpu_list_3op:SF
-	  (match_operand:SF 1 "s_register_operand" "r")
-	  (match_operand:SF 2 "s_register_operand" "r")))]
+	  (match_operand:SF 1 "s_register_operand" "r,r")
+	  (match_operand:SF 2 "float_rhs_operand"  "r,F")))]
   ""
-  "<fpu_list_3op:fpu_opcode>%?\t%0,%1,%2"
+  "@
+  <fpu_list_3op:fpu_opcode>\t%0,%1,%2
+  <fpu_list_3op:fpu_opcode>\t%0,%1,#%f2"
   [(set_attr "length" "4")
    (set_attr "predicable" "no")]
 )
 
 (define_insn "<fpu_list_2op:fpu_insn>"
-  [(set (match_operand:SF 0 "s_register_operand" "=r")
-	(fpu_list_2op:SF (match_operand:SF 1 "s_register_operand" "r")))]
+  [(set (match_operand:SF 0 "s_register_operand"		"=r,r")
+	(fpu_list_2op:SF (match_operand:SF 1 "float_rhs_operand" "r,F")))]
   ""
-  "<fpu_list_2op:fpu_opcode>%?\t%0,%1"
+  "@
+  <fpu_list_2op:fpu_opcode>\t%0,%1
+  <fpu_list_2op:fpu_opcode>\t%0,#%f1"
+  [(set_attr "length" "4")
+   (set_attr "predicable" "no")]
+)
+
+(define_insn "subsf3"
+  [(set (match_operand:SF 0 "s_register_operand"	 "=r,r,r")
+	(minus:SF (match_operand:SF 1 "float_rhs_operand" "r,r,F")
+		  (match_operand:SF 2 "float_rhs_operand" "r,F,r")))]
+  ""
+  "@
+   fsub\t%0,%1,%2
+   fsub\t%0,%1,#%f2
+   frsub\t%0,%2,#%f1"
+  [(set_attr "length" "4")
+   (set_attr "predicable" "no")]
+)
+
+(define_insn "negsf2"
+  [(set (match_operand:SF 0 "s_register_operand"	"=f,r")
+	(neg:SF (match_operand:SF 1 "s_register_operand" "0,r")))]
+  ""
+  "@
+  bitflip.s\t%0,#31\t; fneg
+  bitflip%?.m\t%0,%1,#31\t; fneg"
+  [(set_attr "length" "2,4")
+   (set_attr "predicable" "no,yes")]
+)
+
+; NOTE: We don't know how accurate frcp is.  (Experimentally, not very accurate ; at all.  Maybe not even enough for -ffast-math, when we get to that.  Ahh,
+; it's been pointed out that this is probably intended to be the first estimate
+; for a Newton-Raphson iteration sequence, so we could expand that out).
+
+(define_insn "divsf3"
+  [(set (match_operand:SF 0 "s_register_operand"       "=r,r,  r")
+	(div:SF (match_operand:SF 1 "float_div_lhs"	"r,r,G01")
+		(match_operand:SF 2 "float_rhs_operand" "r,F,  r")))]
+  ""
+  "@
+   fdiv\t%0,%1,%2
+   fdiv\t%0,%1,#%f2
+   frcp\t%0,%2"
+  [(set_attr "length" "4")
+   (set_attr "predicable" "no")
+   (set_attr "enabled" "yes,yes,no")]
+)
+
+(define_insn "vc4_nmulsf3"
+  [(set (match_operand:SF 0 "s_register_operand"		 "=r,r")
+	(mult:SF (neg:SF (match_operand:SF 1 "s_register_operand" "r,r"))
+		 (match_operand:SF 2 "s_register_operand"	  "r,F")))]
+  ""
+  "@
+  fnmul\t%0,%1,%2
+  fnmul\t%0,%1,#%f2"
+  [(set_attr "length" "4")
+   (set_attr "predicable" "no")]
+)
+
+(define_insn "floorsf2"
+  [(set (match_operand:SF 0 "s_register_operand" "=r,r")
+	(unspec:SF [(match_operand:SF 1 "float_rhs_operand" "r,F")]
+		   UNSPEC_FLOOR))]
+  ""
+  "@
+   ffloor\t%0,%1
+   ffloor\t%0,#%f1"
+  [(set_attr "length" "4")
+   (set_attr "predicable" "no")]
+)
+
+(define_insn "ceilsf2"
+  [(set (match_operand:SF 0 "s_register_operand" "=r,r")
+	(unspec:SF [(match_operand:SF 1 "float_rhs_operand" "r,F")]
+		   UNSPEC_CEIL))]
+  ""
+  "@
+   fceil\t%0,%1
+   fceil\t%0,#%f1"
+  [(set_attr "length" "4")
+   (set_attr "predicable" "no")]
+)
+
+(define_insn "log2sf2"
+  [(set (match_operand:SF 0 "s_register_operand" "=r,r")
+	(unspec:SF [(match_operand:SF 1 "float_rhs_operand" "r,F")]
+		   UNSPEC_LOG2))]
+  ""
+  "@
+   flog2\t%0,%1
+   flog2\t%0,#%f1"
+  [(set_attr "length" "4")
+   (set_attr "predicable" "no")]
+)
+
+(define_insn "exp2sf2"
+  [(set (match_operand:SF 0 "s_register_operand" "=r,r")
+	(unspec:SF [(match_operand:SF 1 "float_rhs_operand" "r,F")]
+		   UNSPEC_EXP2))]
+  ""
+  "@
+   fexp2\t%0,%1
+   fexp2\t%0,#%f1"
+  [(set_attr "length" "4")
+   (set_attr "predicable" "no")]
+)
+
+; NOTE: We don't know how accurate frsqrt is.  Don't use for now.  (This might
+; want to be an open-coded Newton-Raphson series expansion, together with
+; frcp.)
+
+(define_insn "rsqrtsf2"
+  [(set (match_operand:SF 0 "s_register_operand" "=r,r")
+	(unspec:SF [(match_operand:SF 1 "float_rhs_operand" "r,F")]
+		   UNSPEC_RSQRT))]
+  "0"
+  "@
+   frsqrt\t%0,%1
+   frsqrt\t%0,#%f1"
   [(set_attr "length" "4")
    (set_attr "predicable" "no")]
 )
@@ -1241,10 +1386,12 @@
 
 (define_insn "*vc4_fcmp"
   [(set (reg:CCFP CC_REGNO)
-        (compare:CCFP (match_operand:SF 0 "s_register_operand" "r")
-                      (match_operand:SF 1 "s_register_operand" "r")))]
+        (compare:CCFP (match_operand:SF 0 "s_register_operand" "r,r")
+                      (match_operand:SF 1 "float_rhs_operand"  "r,F")))]
   ""
-  "fcmp%?\t%0,%1"
+  "@
+  fcmp%?\t%0,%1
+  fcmp%?\t%0,#%f1"
   [(set_attr "length" "4")
    (set_attr "predicable" "no")]
 )
