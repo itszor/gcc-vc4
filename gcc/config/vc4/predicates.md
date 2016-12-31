@@ -79,8 +79,13 @@
        (and (match_code "const_int")
 	    (match_test "INTVAL (op) > 0 && INTVAL (op) <= 32"))))
 
+(define_predicate "cmpbranch_immediate"
+  (and (match_code "const_int")
+       (match_test "INTVAL (op) >= 0 && INTVAL (op) < 64")))
+
 (define_predicate "cmpbranch_operand"
-  (match_operand 0 "btest_operand"))
+  (ior (match_operand 0 "s_register_operand")
+       (match_operand 0 "cmpbranch_immediate")))
 
 (define_predicate "s4_immediate_operand"
   (and (match_code "const_int")
@@ -101,7 +106,7 @@
 
 (define_predicate "low_cmpbranch_operand"
   (ior (match_operand 0 "low_register_operand")
-       (match_operand 0 "bit_number_operand")))
+       (match_operand 0 "cmpbranch_immediate")))
 
 (define_predicate "float_rhs_operand"
   (ior (match_operand 0 "s_register_operand")

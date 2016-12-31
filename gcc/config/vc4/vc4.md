@@ -1418,7 +1418,7 @@
         (if_then_else
 	  (match_operator 0 "ordered_comparison_operator"
 	    [(match_operand:SI 1 "s_register_operand" "f,  f,r,  r")
-	     (match_operand:SI 2 "cmpbranch_operand"  "f,Iu5,r,Iu5")])
+	     (match_operand:SI 2 "cmpbranch_operand"  "f,Iu6,r,Iu6")])
 	  (label_ref (match_operand 3 "" ""))
 	  (pc)))
    (clobber (reg:CC CC_REGNO))]
@@ -1436,7 +1436,7 @@
       if (get_attr_length (insn) == 4)
         return "b%c0\t%1,#%2,%3";
       else
-	return "cmp.s\t%1,#%2\;b%c0.m\t%3";
+	return "cmp\t%1,#%2\;b%c0.m\t%3";
 
     case 2:
       return "cmp.m\t%1,%2\;b%c0.m\t%3";
@@ -1462,7 +1462,7 @@
 	     (and (ge (minus (match_dup 3) (pc)) (const_int -256))
 		  (lt (minus (match_dup 3) (pc)) (const_int 252)))
 	     (const_int 4)
-	     (const_int 6))]
+	     (const_int 8))]
 	  (const_int 8)))
    (set_attr "predicable" "no")]
 )
@@ -1512,7 +1512,7 @@
 	(if_then_else
 	  (match_operator 3 "ordered_comparison_operator"
 	    [(plus:SI (match_dup 1) (match_dup 2))
-	     (match_operand:SI 4 "low_cmpbranch_operand"    "f,Iu5,  f,Iu5")])
+	     (match_operand:SI 4 "low_cmpbranch_operand"    "f,Iu6,  f,Iu6")])
 	  (label_ref (match_operand 5 "" ""))
 	  (pc)))
    (set (match_operand:SI 0 "low_register_operand"	   "=f,  f,  f,  f")
@@ -1534,7 +1534,7 @@
       if (get_attr_length (insn) == 4)
 	return "addcmpb%c3\t%0,%2,#%4,%5";
       else
-	return "add.s\t%0,%2\;cmp.s\t%0,#%4\;b%c3.m\t%5";
+	return "add.s\t%0,%2\;cmp\t%0,#%4\;b%c3.m\t%5";
 
     case 2:
       if (get_attr_length (insn) == 4)
@@ -1558,11 +1558,11 @@
 	{
 	  HOST_WIDE_INT diff = INTVAL (operands[2]);
 	  if (diff >= 0)
-	    return "add.s\t%0,#%2\;cmp.s\t%0,#%4\;b%c3.m\t%5";
+	    return "add.s\t%0,#%2\;cmp\t%0,#%4\;b%c3.m\t%5";
 	  else
 	    {
 	      operands[2] = GEN_INT (-diff);
-	      return "sub.s\t%0,#%2\;cmp.s\t%0,#%4\;b%c3.m\t%5";
+	      return "sub.s\t%0,#%2\;cmp\t%0,#%4\;b%c3.m\t%5";
 	    }
 	}
 
