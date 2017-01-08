@@ -31,12 +31,14 @@
    merge_decl_attributes.  */
 #define TARGET_DLLIMPORT_DECL_ATTRIBUTES 1
 
-#define TARGET_CPU_CPP_BUILTINS() \
-  do \
-    { \
-      builtin_define ("__vc4__"); \
-      builtin_define ("__VC4__"); \
-    } \
+#define TARGET_CPU_CPP_BUILTINS()			\
+  do							\
+    {							\
+      builtin_define ("__vc4__");			\
+      builtin_define ("__VC4__");			\
+      if (TARGET_SINGLE_FLOAT)				\
+        builtin_define ("__VC4_SINGLE_FLOAT__");	\
+    }							\
   while (0)
 
 /* We don't have a -lg library, so don't put it in the list.  */
@@ -65,9 +67,10 @@
 /* Width of a word, in units (bytes).  */
 #define UNITS_PER_WORD 4
 
-/* The size of various important data types (in bits). */
+/* The size of various important data types (in bits).  */
 #define FLOAT_TYPE_SIZE 32
-#define DOUBLE_TYPE_SIZE 64
+#define DOUBLE_TYPE_SIZE (TARGET_SINGLE_FLOAT ? 32 : 64)
+#define LONG_DOUBLE_TYPE_SIZE DOUBLE_TYPE_SIZE
 #define LONG_LONG_TYPE_SIZE 64
 
 /* Allocation boundary (in *bits*) for storing arguments in argument list.  */

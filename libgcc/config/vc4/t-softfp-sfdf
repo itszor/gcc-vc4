@@ -1,0 +1,12 @@
+ifeq ($(double_type_size),64)
+softfp_float_modes := sf df
+softfp_int_modes := si di
+softfp_extensions := sfdf
+softfp_truncations := dfsf
+else
+softfp_float_modes := sf
+softfp_int_modes := si
+softfp_extensions :=
+softfp_truncations :=
+endif
+softfp_exclude_libgcc2 := n
