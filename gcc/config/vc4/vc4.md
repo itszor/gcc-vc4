@@ -21,7 +21,7 @@
 
 ;;- See file "rtl.def" for documentation on define_insn, match_*, et. al.
 
-(define_attr "length" "" (const_int 2))
+(define_attr "length" "" (const_int 10))
 (define_attr "enabled" "no,yes" (const_string "yes"))
 (define_attr "predicable" "no,yes" (const_string "no"))
 
